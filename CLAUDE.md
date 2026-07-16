@@ -54,11 +54,12 @@ Signature/Initials (draw/type/upload, panel-embedded), Highlight, Redact (drag +
 flatten" permanently rasterizes), Watermark, Page numbers, Organize (rotate/duplicate/delete/
 extract/insert blank — acts on the currently-viewed page).
 
-**Stubbed but not wired to real functionality yet** (visible in the tool rail, mockup-only):
-Draw/pen (freehand ink), Shapes (rect/ellipse/line/arrow), Image insert, Hand/pan tool. These
-were scoped out of the first rebuild pass to ship faster — real next step if Zac wants them.
-pdf-lib supports everything needed (`drawLine`, `drawEllipse`, `drawSvgPath` for ink,
-`embedPng`/`embedJpg` for images) so none of these need new dependencies.
+**Now implemented** (previously stubbed): Draw/pen (freehand ink), Shapes (rectangle/ellipse/
+line/arrow), Image insert, and the Hand/pan tool — all wired end-to-end (canvas interaction →
+marker rendering → pdf-lib bake on export). Text is edited **directly on the page** (the marker
+is contenteditable; the right panel is a style inspector), not staged in the side panel.
+
+Tool-rail icons are inline SVG line-icons (see `public/index.html`), not unicode glyphs.
 
 ## Day-to-day
 
