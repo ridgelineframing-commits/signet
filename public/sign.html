@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign document — Signet</title>
+<style>
+  :root { --ink:#16232f; --sub:#5c6b78; --line:#dfe5ea; --bg:#f5f7f9; --brand:#1a2b3c; --brand-2:#2f6fed; --good:#1c8a4c; --bad:#b5342f; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--brand); color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+  header .brand { font-weight:700; }
+  header .doc-title { font-size:13px; color:#c8d5e2; }
+  main { max-width:900px; margin:0 auto; padding:20px 16px 100px; }
+  .banner { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:16px; font-size:13.5px; color:var(--sub); }
+  .page-wrap { position:relative; margin:0 auto 18px; border:1px solid var(--line); background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .page-wrap canvas { display:block; width:100%; }
+  .field { position:absolute; border:2px solid var(--brand-2); background:rgba(47,111,237,.08); border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; }
+  .field.filled { border-color:var(--good); background:rgba(28,138,76,.08); }
+  .field img { max-width:100%; max-height:100%; }
+  .field input[type=text] { border:none; background:transparent; width:100%; height:100%; padding:2px 4px; font-size:13px; }
+  .field .placeholder { font-size:10.5px; color:var(--brand-2); pointer-events:none; }
+  .field.filled .placeholder { display:none; }
+  .field input[type=checkbox] { width:18px; height:18px; }
+
+  .footbar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .btn { background:var(--brand-2); color:#fff; border:none; padding:11px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; }
+  .btn.secondary { background:#eef2f6; color:var(--ink); }
+  .btn.danger { background:#fdecea; color:var(--bad); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+
+  .modal-back { position:fixed; inset:0; background:rgba(10,16,22,.55); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal { background:#fff; border-radius:12px; padding:22px; width:min(520px,92vw); }
+  .modal h3 { margin:0 0 14px; }
+  .tabbtns { display:flex; gap:6px; margin-bottom:12px; }
+  .tabbtns button { background:#eef2f6; border:none; padding:7px 14px; border-radius:7px; cursor:pointer; font-size:13px; }
+  .tabbtns button.active { background:var(--brand); color:#fff; }
+  canvas#sigPad { border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; }
+  .foot { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+  textarea { width:100%; border:1px solid var(--line); border-radius:7px; padding:8px; font-size:13.5px; }
+
+  #centerState { min-height:80vh; display:flex; align-items:center; justify-content:center; text-align:center; padding:20px; }
+  #centerState .box { max-width:420px; }
+  #centerState h2 { margin-bottom:6px; }
+  #centerState p { color:var(--sub); }
+</style>
+</head>
+<body>
+
+<div id="centerState" hidden><div class="box"><h2 id="csTitle"></h2><p id="csMsg"></p></div></div>
+
+<div id="signApp" hidden>
+  <header>
+    <div><div class="brand">Signet</div><div class="doc-title" id="docTitle"></div></div>
+    <div id="progressLabel" style="font-size:12.5px;color:#c8d5e2"></div>
+  </header>
+  <main>
+    <div class="banner" id="banner"></div>
+    <div id="pagesWrap"></div>
+  </main>
+  <div class="footbar">
+    <button class="btn danger" id="declineBtn">Decline to sign</button>
+    <div style="font-size:12.5px;color:var(--sub)" id="fieldsLeft"></div>
+    <button class="btn" id="submitBtn">Review & submit</button>
+  </div>
+</div>
+
+<div class="modal-back" id="sigModalBack" hidden>
+  <div class="modal">
+    <h3>Add your signature</h3>
+    <div class="tabbtns">
+      <button data-sm="draw" class="active">Draw</button>
+      <button data-sm="type">Type</button>
+      <button data-sm="upload">Upload</button>
+    </div>
+    <div id="sm-draw"><canvas id="sigPad" width="480" height="160"></canvas>
+      <div style="margin-top:8px"><button class="btn secondary" id="sigClear">Clear</button></div></div>
+    <div id="sm-type" hidden><input type="text" id="sigTypeInput" placeholder="Type your name" style="width:100%;font-size:26px;font-family:'Brush Script MT',cursive;padding:12px;border:1px solid var(--line);border-radius:8px" /></div>
+    <div id="sm-upload" hidden><input type="file" id="sigUploadInput" accept="image/*" /></div>
+    <div class="foot"><button class="btn secondary" id="sigCancel">Cancel</button><button class="btn" id="sigUse">Use this signature</button></div>
+  </div>
+</div>
+
+<div class="modal-back" id="declineModalBack" hidden>
+  <div class="modal">
+    <h3>Decline to sign?</h3>
+    <textarea id="declineReason" rows="3" placeholder="Reason (optional) — shared with the sender"></textarea>
+    <div class="foot"><button class="btn secondary" id="declineCancel">Cancel</button><button class="btn danger" id="declineConfirm">Decline</button></div>
+  </div>
+</div>
+
+<div class="modal-back" id="reviewModalBack" hidden>
+  <div class="modal">
+    <h3>Confirm and sign</h3>
+    <p style="font-size:13px;color:var(--sub)">By clicking "Sign & submit" you agree this constitutes your electronic signature on <strong id="reviewTitle"></strong>, and is as legally binding as a handwritten signature.</p>
+    <div class="foot"><button class="btn secondary" id="reviewCancel">Back</button><button class="btn" id="reviewConfirm">Sign & submit</button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script type="module">
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.worker.min.mjs";
+
+const token = new URLSearchParams(location.search).get("t");
+const state = { data: null, values: {} }; // values[fieldId] = { text, image }
+
+function showCenter(title, msg) {
+  document.getElementById("csTitle").textContent = title;
+  document.getElementById("csMsg").textContent = msg;
+  document.getElementById("centerState").hidden = false;
+  document.getElementById("signApp").hidden = true;
+}
+
+async function load() {
+  if (!token) return showCenter("Missing link", "This signing link is incomplete. Ask the sender to resend it.");
+  const res = await fetch(`/api/sign/${token}`);
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    return showCenter("Can't open this document", j.error || "This link is invalid or has expired.");
+  }
+  state.data = await res.json();
+  const { envelope, recipient } = state.data;
+
+  if (envelope.status === "completed" || recipient.status === "signed") {
+    return showCenter("Already signed", "Thanks — this document has already been signed.");
+  }
+  if (["voided", "declined"].includes(envelope.status)) {
+    return showCenter("No longer available", "This document is no longer available for signing.");
+  }
+
+  document.getElementById("docTitle").textContent = envelope.title;
+  document.getElementById("progressLabel").textContent = `Signing as ${recipient.name}`;
+  document.getElementById("banner").textContent = envelope.message
+    ? envelope.message
+    : `Please review ${envelope.title} and complete the highlighted fields below.`;
+  document.getElementById("signApp").hidden = false;
+
+  await renderPdf();
+  updateFieldsLeft();
+}
+load();
+
+async function renderPdf() {
+  const res = await fetch(state.data.pdfUrl);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const wrap = document.getElementById("pagesWrap");
+  wrap.innerHTML = "";
+  for (let i = 0; i < doc.numPages; i++) {
+    const page = await doc.getPage(i + 1);
+    const viewport = page.getViewport({ scale: 1.3 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    const pageWrap = document.createElement("div");
+    pageWrap.className = "page-wrap";
+    pageWrap.style.maxWidth = viewport.width + "px";
+    pageWrap.appendChild(canvas);
+    wrap.appendChild(pageWrap);
+
+    for (const f of state.data.fields.filter((f) => f.page === i)) {
+      const el = document.createElement("div");
+      el.className = "field";
+      el.style.left = f.x * 100 + "%"; el.style.top = f.y * 100 + "%";
+      el.style.width = f.w * 100 + "%"; el.style.height = f.h * 100 + "%";
+      renderFieldContent(el, f);
+      pageWrap.appendChild(el);
+    }
+  }
+}
+
+function renderFieldContent(el, f) {
+  el.innerHTML = "";
+  const v = state.values[f.id];
+  if (f.type === "signature" || f.type === "initials") {
+    if (v?.image) { const img = document.createElement("img"); img.src = v.image; el.appendChild(img); el.classList.add("filled"); }
+    else { const p = document.createElement("span"); p.className = "placeholder"; p.textContent = f.type === "initials" ? "Click to initial" : "Click to sign"; el.appendChild(p); }
+    el.onclick = () => openSigModal(f);
+  } else if (f.type === "date") {
+    if (!v) state.values[f.id] = { text: new Date().toLocaleDateString() };
+    el.textContent = state.values[f.id].text;
+    el.classList.add("filled");
+  } else if (f.type === "checkbox") {
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = v?.text === "true";
+    input.onchange = () => { state.values[f.id] = { text: input.checked ? "true" : "false" }; el.classList.toggle("filled", input.checked); updateFieldsLeft(); };
+    el.appendChild(input);
+  } else {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = f.label || "Type here";
+    input.value = v?.text || "";
+    input.oninput = () => { state.values[f.id] = { text: input.value }; el.classList.toggle("filled", !!input.value); updateFieldsLeft(); };
+    el.appendChild(input);
+  }
+}
+
+function updateFieldsLeft() {
+  const required = state.data.fields.filter((f) => f.required);
+  const done = required.filter((f) => state.values[f.id]?.text || state.values[f.id]?.image).length;
+  document.getElementById("fieldsLeft").textContent = `${done}/${required.length} required fields complete`;
+  document.getElementById("submitBtn").disabled = done < required.length;
+}
+
+// ---- signature modal (shared draw/type/upload flow) ----
+const sigModal = document.getElementById("sigModalBack");
+let sigTargetField = null;
+function openSigModal(field) { sigTargetField = field; sigModal.hidden = false; }
+document.getElementById("sigCancel").onclick = () => (sigModal.hidden = true);
+for (const b of document.querySelectorAll("#sigModalBack .tabbtns button")) {
+  b.onclick = () => {
+    for (const x of document.querySelectorAll("#sigModalBack .tabbtns button")) x.classList.remove("active");
+    b.classList.add("active");
+    document.getElementById("sm-draw").hidden = b.dataset.sm !== "draw";
+    document.getElementById("sm-type").hidden = b.dataset.sm !== "type";
+    document.getElementById("sm-upload").hidden = b.dataset.sm !== "upload";
+  };
+}
+const sigPad = document.getElementById("sigPad");
+const sigCtx = sigPad.getContext("2d");
+sigCtx.lineWidth = 2.4; sigCtx.strokeStyle = "#16232f"; sigCtx.lineCap = "round";
+let drawing = false, lastPt = null;
+function ptFromEvent(ev) {
+  const r = sigPad.getBoundingClientRect();
+  const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+  const cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
+  return [cx * (sigPad.width / r.width), cy * (sigPad.height / r.height)];
+}
+sigPad.addEventListener("pointerdown", (e) => { drawing = true; lastPt = ptFromEvent(e); });
+sigPad.addEventListener("pointermove", (e) => { if (!drawing) return; const [x, y] = ptFromEvent(e); sigCtx.beginPath(); sigCtx.moveTo(...lastPt); sigCtx.lineTo(x, y); sigCtx.stroke(); lastPt = [x, y]; });
+window.addEventListener("pointerup", () => (drawing = false));
+document.getElementById("sigClear").onclick = () => sigCtx.clearRect(0, 0, sigPad.width, sigPad.height);
+
+document.getElementById("sigUse").onclick = async () => {
+  const activeTab = document.querySelector("#sigModalBack .tabbtns button.active").dataset.sm;
+  let dataUrl;
+  if (activeTab === "draw") {
+    dataUrl = sigPad.toDataURL("image/png");
+  } else if (activeTab === "type") {
+    const name = document.getElementById("sigTypeInput").value || "Signed";
+    const c = document.createElement("canvas"); c.width = 480; c.height = 140;
+    const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, c.height);
+    cx.fillStyle = "#16232f"; cx.font = "52px 'Brush Script MT', cursive"; cx.fillText(name, 16, 88);
+    dataUrl = c.toDataURL("image/png");
+  } else {
+    const file = document.getElementById("sigUploadInput").files[0];
+    if (!file) return alert("Choose an image file first.");
+    dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+  }
+  state.values[sigTargetField.id] = { image: dataUrl };
+  sigModal.hidden = true;
+  await renderPdf();
+  updateFieldsLeft();
+};
+
+// ---- decline ----
+document.getElementById("declineBtn").onclick = () => (document.getElementById("declineModalBack").hidden = false);
+document.getElementById("declineCancel").onclick = () => (document.getElementById("declineModalBack").hidden = true);
+document.getElementById("declineConfirm").onclick = async () => {
+  const reason = document.getElementById("declineReason").value;
+  await fetch(`/api/sign/${token}/decline`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason }) });
+  document.getElementById("declineModalBack").hidden = true;
+  showCenter("Declined", "You've declined to sign this document. The sender has been notified.");
+};
+
+// ---- review & submit ----
+document.getElementById("submitBtn").onclick = () => {
+  document.getElementById("reviewTitle").textContent = state.data.envelope.title;
+  document.getElementById("reviewModalBack").hidden = false;
+};
+document.getElementById("reviewCancel").onclick = () => (document.getElementById("reviewModalBack").hidden = true);
+document.getElementById("reviewConfirm").onclick = async () => {
+  document.getElementById("reviewConfirm").disabled = true;
+  const res = await fetch(`/api/sign/${token}`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ values: state.values }),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    alert(j.error || "Couldn't submit — please try again.");
+    document.getElementById("reviewConfirm").disabled = false;
+    return;
+  }
+  document.getElementById("reviewModalBack").hidden = true;
+  showCenter("Signed — thank you", "Your signature has been recorded. You'll get an email with the final document once everyone has signed.");
+};
+</script>
+</body>
+</html>
