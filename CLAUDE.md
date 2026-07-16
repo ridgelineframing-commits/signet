@@ -61,6 +61,16 @@ is contenteditable; the right panel is a style inspector), not staged in the sid
 
 Tool-rail icons are inline SVG line-icons (see `public/index.html`), not unicode glyphs.
 
+**Edit text (OCR)**: the `edittext` tool runs Tesseract (vendored under `public/vendor/tesseract/`,
+no network) on the current page, turns each recognized line into an editable box laid over the
+original, and on export patches edited lines (white cover + Helvetica re, in `bakeAndExport`).
+Untouched lines are left as-is. Caveat: the patch visually covers the original but the original
+text remains in the PDF's text layer underneath — for true removal of sensitive text use
+Redact → Apply & flatten (which rasterizes).
+
+All third-party libs (pdf.js, pdf-lib, the webfont, Tesseract) are vendored under
+`public/vendor/` — there are **no CDN runtime dependencies**.
+
 ## Day-to-day
 
 ```bash

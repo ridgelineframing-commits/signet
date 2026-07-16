@@ -4,11 +4,19 @@ A self-hosted PDF toolkit + e-signature app — the DocuSign-style piece you ask
 separate from Yardstick. Runs entirely on your own Cloudflare account.
 
 - **PDF editor** — an Adobe-style 3-pane editor (tool rail, page thumbnails, zoomable canvas,
-  contextual properties panel). Merge, reorder/delete/rotate pages, extract pages, insert
-  blank pages, watermark, page numbers, click-to-place text, draw/type/upload a signature to
-  stamp on a document yourself, and redaction (with an optional "flatten" mode that rasterizes
-  the page so the text underneath is truly gone, not just painted over). 100% client-side —
-  nothing you edit here touches the network until you Download or Send.
+  contextual properties panel). Type text **directly on the page**, draw freehand, drop
+  shapes (rectangle/ellipse/line/arrow), insert images, highlight, hand/pan, merge,
+  reorder/delete/rotate pages, extract pages, insert blank pages, watermark, page numbers,
+  draw/type/upload a signature to stamp yourself, and redaction (with an optional "flatten"
+  mode that rasterizes the page so the text underneath is truly gone, not just painted over).
+- **Edit text (OCR)** — reads a scanned/flat page with bundled OCR (Tesseract, no network) and
+  lets you edit its existing text in place, Adobe-style; edited lines are patched into the
+  export. *Note:* the patch covers the original visually but the original text stays in the
+  file's text layer — for true removal of sensitive text, use Redact → Apply & flatten.
+
+  Everything above is 100% client-side — nothing you edit touches the network until you
+  Download or Send. All libraries (pdf.js, pdf-lib, the webfont, the OCR engine) are
+  self-hosted under `public/vendor/`, so there are no third-party CDN dependencies at runtime.
 - **Send for signature** — from the editor, add recipients with a signing order, drop
   signature/initials/date/text/checkbox fields onto the pages per recipient, and send.
   Recipients get an emailed link (no login) to review and sign. Once everyone's signed, Signet

@@ -11,6 +11,9 @@ copied verbatim from its npm package.
 | `pdf.min.mjs`               | `pdfjs-dist` 6.1.200 (`build/`)   |
 | `pdf.worker.min.mjs`        | `pdfjs-dist` 6.1.200 (`build/`)   |
 | `fonts/*.woff2`, `fonts.css`| `@fontsource/hanken-grotesk` 5.x  |
+| `tesseract/tesseract.esm.min.js`, `tesseract/worker.min.js` | `tesseract.js` 5.x |
+| `tesseract/tesseract-core-simd-lstm.wasm{,.js}` | `tesseract.js-core` 5.x |
+| `tesseract/eng.traineddata.gz` | `@tesseract.js-data/eng` (the smaller `4.0.0_best_int` model) |
 
 All three are pinned as `devDependencies` in `package.json` purely to track provenance and make
 re-vendoring reproducible — they are **not** loaded from `node_modules` at runtime.
@@ -27,5 +30,15 @@ for w in 400 500 600 700; do
 done
 ```
 
+```bash
+# OCR (Edit-text tool):
+npm install --save-dev tesseract.js@5 tesseract.js-core@5 @tesseract.js-data/eng
+cp node_modules/tesseract.js/dist/tesseract.esm.min.js            public/vendor/tesseract/
+cp node_modules/tesseract.js/dist/worker.min.js                    public/vendor/tesseract/
+cp node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm{,.js} public/vendor/tesseract/
+cp node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz public/vendor/tesseract/
+```
+
 If you bump the pdf.js major version, re-check the API calls in `public/app.js` and
-`public/sign.html` (they use `getDocument`, `getPage`, `getViewport`, `page.render`).
+`public/sign.html` (they use `getDocument`, `getPage`, `getViewport`, `page.render`). The
+Tesseract worker/core/lang paths are configured in `getOcrWorker()` in `public/app.js`.

@@ -98,6 +98,8 @@ aside.props{flex:0 0 300px;background:#fff;border-left:1px solid var(--line);ove
 .tabbtns button.active{background:var(--ink);color:#fff;}
 .marker{position:absolute;border:1.5px dashed var(--accent);background:rgba(79,70,229,.1);font-size:9px;color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .textmarker{font-family:Helvetica,Arial,sans-serif;cursor:text;min-width:6px;z-index:3;}
+.edittext{position:absolute;white-space:pre-wrap;overflow:hidden;outline:none;line-height:1.05;font-family:Helvetica,Arial,sans-serif;color:#0d0d14;cursor:text;box-sizing:border-box;padding:0 1px;z-index:3;}
+.edittext:focus{box-shadow:0 0 0 1.5px var(--accent);background:#fff !important;color:#0d0d14 !important;}
 .x{position:absolute;width:16px;height:16px;border-radius:50%;border:none;background:var(--bad);color:#fff;font-size:10px;line-height:1;z-index:6;padding:0;}
 .marker .x{top:-8px;right:-8px;}
 canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;touch-action:none;background:#fbfbfc;width:100%;}
@@ -158,6 +160,8 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
       <div class="raildiv"></div>
       <button class="railbtn" data-tool="text" title="Text">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5h12M12 5v14M9.5 19h5"/></svg></button>
+      <button class="railbtn" data-tool="edittext" title="Edit text (OCR)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10.5h8M4 15h9"/><path d="M14.5 19.5l5-5 2 2-5 5h-2z"/></svg></button>
       <button class="railbtn" data-tool="signature" title="Signature / initials">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15c2.5 0 3-5 5.5-5s2 4 4 4 2.5-4 4.5-4"/><path d="M3 20h18"/></svg></button>
       <button class="railbtn" data-tool="draw" title="Draw (freehand)">

@@ -52,6 +52,7 @@ const TOOL_LABELS = {
   select: ["Select", "Click any element on the page to select it, or use a tool from the rail."],
   hand: ["Hand", "Drag the page to pan around. Nothing is added to the document."],
   text: ["Text", "Click anywhere on the page, then type directly on it."],
+  edittext: ["Edit text", "OCR the page, then edit its existing text in place (Adobe-style)."],
   signature: ["Signature", "Draw, type, or upload a signature, then click the page to place it."],
   draw: ["Draw", "Pick a color and thickness, then drag on the page to draw freehand."],
   shape: ["Shapes", "Pick a shape, then drag on the page to place it."],
@@ -191,6 +192,7 @@ async function renderCurrentPage() {
   const canvas = document.createElement("canvas");
   canvas.width = viewport.width; canvas.height = viewport.height;
   await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+  tk._pageDims = { w: viewport.width, h: viewport.height };
 
   const box = document.createElement("div");
   box.className = "pagebox";
@@ -233,6 +235,7 @@ document.querySelectorAll("#toolRail [data-tool]").forEach((b) => {
 function drawMarker(box, a) {
   if (a.kind === "ink" || a.kind === "shape") return drawVectorMarker(box, a);
   if (a.kind === "text") return drawTextMarker(box, a);
+  if (a.kind === "edittext") return drawEditTextMarker(box, a);
   const m = document.createElement("div");
   m.className = "marker";
   m.style.left = a.x * 100 + "%"; m.style.top = a.y * 100 + "%";
@@ -301,6 +304,89 @@ function highlightActiveText() {
 function placeCaretEnd(el) {
   const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
   const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+
+// OCR-recognized text lines: each becomes an editable box sitting exactly over the original
+// text. Until you change one it's transparent (you see the real page underneath); once edited
+// it turns opaque white so it "covers" the original, previewing the patch that export applies.
+function drawEditTextMarker(box, a) {
+  const editable = tk.tool === "edittext" || tk.tool === "select";
+  const m = document.createElement("div");
+  m.className = "edittext";
+  m.style.left = a.x * 100 + "%"; m.style.top = a.y * 100 + "%";
+  m.style.width = a.w * 100 + "%"; m.style.height = a.h * 100 + "%";
+  m.style.fontSize = (a.h * (tk._pageDims?.h || 1000) * 0.82) + "px";
+  m.textContent = a.text;
+  // Until a line is edited it shows the real page underneath (transparent text over a faint
+  // tint); editing/focusing reveals the text on an opaque white patch (see .edittext:focus).
+  m.style.background = a.dirty ? "#fff" : (editable ? "rgba(79,70,229,.07)" : "transparent");
+  m.style.color = a.dirty ? "#0d0d14" : "transparent";
+  a._el = m;
+  if (editable) {
+    m.contentEditable = "true"; m.spellcheck = false;
+    m.addEventListener("pointerdown", (e) => e.stopPropagation());
+    m.addEventListener("click", (e) => e.stopPropagation());
+    m.addEventListener("input", () => { a.text = m.innerText; if (a.text !== a.origText && !a.dirty) { a.dirty = true; m.style.background = "#fff"; m.style.color = "#0d0d14"; } });
+  } else {
+    m.style.pointerEvents = "none";
+  }
+  box.appendChild(m);
+  if (editable) {
+    const rm = removeBtn(a);
+    rm.style.position = "absolute"; rm.style.left = a.x * 100 + "%"; rm.style.top = a.y * 100 + "%"; rm.style.transform = "translate(-50%,-50%)";
+    box.appendChild(rm);
+  }
+}
+
+// ------------------------------------------------------------------ OCR (Tesseract, vendored)
+let ocrWorker = null, ocrBusy = false;
+async function getOcrWorker(onProgress) {
+  if (ocrWorker) return ocrWorker;
+  const mod = await import("./vendor/tesseract/tesseract.esm.min.js");
+  const createWorker = mod.createWorker || mod.default?.createWorker;
+  ocrWorker = await createWorker("eng", 1, {
+    workerPath: "/vendor/tesseract/worker.min.js",
+    corePath: "/vendor/tesseract/tesseract-core-simd-lstm.wasm.js",
+    langPath: "/vendor/tesseract/",
+    gzip: true,
+    logger: onProgress || undefined,
+  });
+  return ocrWorker;
+}
+async function ocrCurrentPage(statusEl) {
+  if (!hasDoc() || ocrBusy) return;
+  ocrBusy = true;
+  const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+  try {
+    setStatus("Loading OCR engine… (first run only)");
+    const worker = await getOcrWorker((m) => { if (m.status) setStatus(m.status[0].toUpperCase() + m.status.slice(1) + (m.progress ? ` — ${Math.round(m.progress * 100)}%` : "…")); });
+    setStatus("Rendering page…");
+    const doc = await getRenderDoc();
+    const page = await doc.getPage(tk.order[tk.currentPage] + 1);
+    const vp = page.getViewport({ scale: 2.5 }); // higher res than the editor canvas for accuracy
+    const canvas = document.createElement("canvas");
+    canvas.width = vp.width; canvas.height = vp.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+    setStatus("Recognizing text…");
+    const { data } = await worker.recognize(canvas);
+    tk.annos = tk.annos.filter((a) => !(a.kind === "edittext" && a.page === tk.currentPage)); // re-scan replaces
+    let n = 0;
+    for (const line of data.lines || []) {
+      const t = (line.text || "").replace(/\n/g, " ").trim();
+      if (!t) continue;
+      const bb = line.bbox;
+      const x = bb.x0 / canvas.width, y = bb.y0 / canvas.height, w = (bb.x1 - bb.x0) / canvas.width, h = (bb.y1 - bb.y0) / canvas.height;
+      if (w <= 0 || h <= 0) continue;
+      tk.annos.push({ kind: "edittext", page: tk.currentPage, x, y, w, h, text: t, origText: t, dirty: false });
+      n++;
+    }
+    await renderCurrentPage();
+    setStatus(n ? `${n} line${n === 1 ? "" : "s"} recognized — click any line to edit it in place.` : "No text detected on this page.");
+  } catch (e) {
+    console.error(e); setStatus("OCR failed: " + (e?.message || e));
+  } finally {
+    ocrBusy = false;
+  }
 }
 function removeBtn(a) {
   const rm = document.createElement("button");
@@ -373,7 +459,7 @@ function clampPt(x, y) { return { x: Math.min(1, Math.max(0, x)), y: Math.min(1,
 
 function bindCanvasInteraction(box) {
   box.style.cursor = tk.tool === "hand" ? "grab"
-    : tk.tool === "text" ? "text"
+    : ["text", "edittext"].includes(tk.tool) ? "text"
     : ["draw", "shape", "highlight", "redact"].includes(tk.tool) ? "crosshair"
     : (["signature", "image"].includes(tk.tool) && tk.placeArmed) ? "copy" : "default";
 
@@ -516,11 +602,22 @@ function renderPropsPanel() {
   const body = $("propsBody");
   body.innerHTML = "";
   if (!hasDoc() && tk.tool !== "select") { body.innerHTML = '<div class="props-empty">Load a PDF first.</div>'; return; }
-  const builders = { select: buildSelectPanel, hand: buildHandPanel, text: buildTextPanel, signature: buildSigPanel, draw: buildDrawPanel, shape: buildShapePanel, highlight: buildHighlightPanel, image: buildImagePanel, redact: buildRedactPanel, watermark: buildWatermarkPanel, pagenum: buildPagenumPanel, organize: buildOrganizePanel };
+  const builders = { select: buildSelectPanel, hand: buildHandPanel, text: buildTextPanel, edittext: buildEditTextPanel, signature: buildSigPanel, draw: buildDrawPanel, shape: buildShapePanel, highlight: buildHighlightPanel, image: buildImagePanel, redact: buildRedactPanel, watermark: buildWatermarkPanel, pagenum: buildPagenumPanel, organize: buildOrganizePanel };
   (builders[tk.tool] || buildSelectPanel)(body);
 }
 function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Nothing selected.<br>Click any element on the page to remove it (×), or pick a tool from the rail on the left.</div>'; }
 function buildHandPanel(body) { body.innerHTML = '<p class="hint">Drag anywhere on the page to pan around. Handy when zoomed in. This tool never changes the document.</p>'; }
+
+function buildEditTextPanel(body) {
+  const count = tk.annos.filter((a) => a.kind === "edittext" && a.page === tk.currentPage).length;
+  const edited = tk.annos.filter((a) => a.kind === "edittext" && a.page === tk.currentPage && a.dirty).length;
+  body.innerHTML = `
+    <p class="hint" style="margin-bottom:12px">Make an existing PDF's text editable. Signet reads the current page with OCR, then lets you edit each line right on the page. Edited lines get patched into the exported PDF; untouched text is left exactly as it was.</p>
+    <button class="btn primary" id="ocrBtn" style="width:100%;justify-content:center" ${ocrBusy ? "disabled" : ""}>${count ? "Re-scan this page" : "Scan this page for text"}</button>
+    <p class="hint" id="ocrStatus" style="margin-top:12px">${count ? `${count} line(s) recognized${edited ? `, ${edited} edited` : ""}.` : ""}</p>
+    <p class="hint" style="margin-top:14px;color:var(--sub3)">Patched text is set in Helvetica, so it reads best on plain / white backgrounds. First scan downloads the OCR model once (it's bundled, no network).</p>`;
+  $("ocrBtn").onclick = () => ocrCurrentPage($("ocrStatus"));
+}
 
 function buildDrawPanel(body) {
   body.innerHTML = `
@@ -838,6 +935,19 @@ async function bakeAndExport() {
       const dw = img.width * scale, dh = img.height * scale;
       const boxX = a.x * width, boxYtop = a.y * height, y = height - boxYtop - h;
       page.drawImage(img, { x: boxX + (w - dw) / 2, y: y + (h - dh) / 2, width: dw, height: dh });
+    } else if (a.kind === "edittext") {
+      if (!a.dirty) continue; // untouched OCR lines: leave the original page exactly as-is
+      const bx = a.x * width, bw = a.w * width, bh = a.h * height, by = height - a.y * height - bh;
+      const padY = bh * 0.18, padX = 2; // over-cover a little so ascenders/descenders of the original are hidden
+      page.drawRectangle({ x: bx - padX, y: by - padY, width: bw + padX * 2, height: bh + padY * 2, color: rgb(1, 1, 1) });
+      const lines = String(a.text || "").split("\n").filter((l) => l.length);
+      if (lines.length) {
+        const per = bh / lines.length;
+        let size = per * 0.82;
+        const widest = Math.max(1, ...lines.map((l) => font.widthOfTextAtSize(l, size)));
+        if (widest > bw) size = Math.max(4, size * (bw / widest));
+        lines.forEach((l, i) => page.drawText(l, { x: bx, y: by + bh - (i + 1) * per + per * 0.2, size, font, color: rgb(0.05, 0.05, 0.08) }));
+      }
     } else if (a.kind === "ink") {
       const c = hexToRgb01(a.color); const col = rgb(c.r, c.g, c.b); const t = a.width / RENDER_SCALE;
       for (let i = 1; i < a.points.length; i++) {
