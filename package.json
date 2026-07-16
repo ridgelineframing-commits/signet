@@ -1,0 +1,20 @@
+{
+  "name": "signet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted PDF toolkit + e-signature (DocuSign-style) app on Cloudflare Workers, D1, R2, and Resend.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 execute signet-db --file=./schema.sql --remote",
+    "db:migrate:local": "wrangler d1 execute signet-db --file=./schema.sql --local",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

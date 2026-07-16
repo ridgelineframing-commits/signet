@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Signet — PDF Toolkit & E-Signature</title>
+<style>
+  :root {
+    --ink: #16232f; --sub: #5c6b78; --line: #dfe5ea; --bg: #f5f7f9; --card: #ffffff;
+    --brand: #1a2b3c; --brand-2: #2f6fed; --good: #1c8a4c; --warn: #b5760b; --bad: #b5342f;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  header.top { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; background:var(--brand); color:#fff; }
+  header.top .brand { font-size:19px; font-weight:700; letter-spacing:.3px; }
+  header.top .brand span { color:#8fb3ff; }
+  header.top nav { display:flex; gap:6px; }
+  header.top nav button { background:transparent; border:1px solid rgba(255,255,255,.25); color:#dce6f2; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:14px; }
+  header.top nav button.active { background:#fff; color:var(--brand); font-weight:600; border-color:#fff; }
+  header.top .logout { background:transparent; border:none; color:#b9c6d3; cursor:pointer; font-size:13px; text-decoration:underline; }
+
+  main { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin-bottom:16px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  h3 { font-size:14px; margin:0 0 8px; color:var(--sub); text-transform:uppercase; letter-spacing:.04em; }
+
+  button { font: inherit; }
+  .btn { background:var(--brand-2); color:#fff; border:none; padding:9px 14px; border-radius:8px; cursor:pointer; font-size:13.5px; }
+  .btn.secondary { background:#eef2f6; color:var(--ink); }
+  .btn.danger { background:#fdecea; color:var(--bad); }
+  .btn.ghost { background:transparent; color:var(--brand-2); padding:6px 8px; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn.active { outline:2px solid var(--brand); }
+  input[type=text], input[type=email], input[type=number], input[type=password], select, textarea {
+    border:1px solid var(--line); border-radius:7px; padding:8px 10px; font-size:13.5px; background:#fff;
+  }
+
+  #loginScreen { min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--brand); }
+  #loginScreen .box { background:#fff; padding:32px; border-radius:14px; width:320px; text-align:center; }
+  #loginScreen .box h1 { font-size:22px; margin:0 0 4px; }
+  #loginScreen .box p { color:var(--sub); font-size:13px; margin:0 0 18px; }
+  #loginScreen input { width:100%; margin-bottom:10px; }
+  #loginScreen .err { color:var(--bad); font-size:13px; min-height:18px; }
+
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .pages { display:flex; flex-wrap:wrap; gap:16px; }
+  .page-card { border:1px solid var(--line); border-radius:8px; background:#fff; padding:8px; width:190px; position:relative; cursor:grab; }
+  .page-card.selected { outline:2px solid var(--brand-2); }
+  .page-card canvas { width:100%; display:block; border:1px solid #eee; }
+  .page-card .idx { font-size:11px; color:var(--sub); margin-top:6px; display:flex; justify-content:space-between; }
+  .page-card .mini { position:absolute; top:6px; right:6px; display:flex; gap:4px; }
+  .page-card .mini button { border:none; background:#fff; border-radius:5px; width:22px; height:22px; font-size:12px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+  .anno-marker { position:absolute; border:1.5px dashed var(--brand-2); background:rgba(47,111,237,.12); font-size:9px; color:var(--brand-2); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .anno-marker button { position:absolute; top:-8px; right:-8px; width:16px; height:16px; border-radius:50%; border:none; background:var(--bad); color:#fff; font-size:10px; line-height:1; cursor:pointer; }
+
+  .empty { color:var(--sub); font-size:13.5px; padding:30px; text-align:center; border:1px dashed var(--line); border-radius:8px; }
+
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  table th, table td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); }
+  .pill { display:inline-block; padding:2px 9px; border-radius:99px; font-size:11.5px; font-weight:600; }
+  .pill.draft { background:#eef2f6; color:var(--sub); }
+  .pill.sent, .pill.partially_signed { background:#fff3e0; color:var(--warn); }
+  .pill.completed { background:#e4f6ea; color:var(--good); }
+  .pill.voided, .pill.declined { background:#fdecea; color:var(--bad); }
+
+  .modal-back { position:fixed; inset:0; background:rgba(10,16,22,.55); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal { background:#fff; border-radius:12px; padding:22px; width:min(560px,92vw); max-height:88vh; overflow:auto; }
+  .modal h3 { color:var(--ink); text-transform:none; font-size:17px; margin-bottom:14px; }
+  .modal .foot { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .field-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .field-row input, .field-row select { flex:1; }
+  canvas#sigPad { border:1px solid var(--line); border-radius:8px; cursor:crosshair; touch-action:none; }
+  .tabbtns { display:flex; gap:6px; margin-bottom:14px; }
+  .tabbtns button { background:#eef2f6; border:none; padding:7px 14px; border-radius:7px; cursor:pointer; font-size:13px; }
+  .tabbtns button.active { background:var(--brand); color:#fff; }
+  .hint { font-size:12px; color:var(--sub); }
+  .recipient-chip { display:inline-flex; align-items:center; gap:6px; background:#eef2f6; padding:5px 10px; border-radius:99px; font-size:12.5px; cursor:pointer; }
+  .recipient-chip.active { background:var(--brand); color:#fff; }
+  .swatch { width:9px; height:9px; border-radius:50%; display:inline-block; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="box">
+    <h1>Signet</h1>
+    <p>PDF toolkit &amp; e-signature</p>
+    <input id="loginPassword" type="password" placeholder="Password" />
+    <button class="btn" style="width:100%" id="loginBtn">Unlock</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand">Signet<span>.</span></div>
+    <nav>
+      <button data-tab="toolkit" class="active">PDF Toolkit</button>
+      <button data-tab="envelopes">Envelopes</button>
+    </nav>
+    <button class="logout" id="logoutBtn">Sign out</button>
+  </header>
+
+  <main>
+    <!-- ============================= TOOLKIT TAB ============================= -->
+    <section id="tab-toolkit">
+      <div class="card">
+        <h2>Load a PDF</h2>
+        <div class="row">
+          <input type="file" id="fileInput" accept="application/pdf" multiple />
+          <span class="hint">Pick one file to edit, or several to merge them in order.</span>
+        </div>
+      </div>
+
+      <div class="card" id="toolbarCard" hidden>
+        <h2>Tools</h2>
+        <div class="toolbar">
+          <button class="btn secondary" id="tRotateL">⟲ Rotate left</button>
+          <button class="btn secondary" id="tRotateR">⟳ Rotate right</button>
+          <button class="btn secondary" id="tDeleteSel">Delete selected</button>
+          <button class="btn secondary" id="tExtractSel">Extract selected → new PDF</button>
+          <button class="btn secondary" id="tInsertBlank">Insert blank page</button>
+          <button class="btn secondary" id="tMergeMore">＋ Merge more files</button>
+          <span style="width:1px;background:var(--line);align-self:stretch"></span>
+          <button class="btn secondary" id="tWatermark">Watermark…</button>
+          <button class="btn secondary" id="tPageNum">Page numbers…</button>
+          <button class="btn secondary" id="tAddText">Add text</button>
+          <button class="btn secondary" id="tAddSig">Add signature / initials</button>
+          <button class="btn secondary" id="tRedact">Redact (draw box)</button>
+          <span style="width:1px;background:var(--line);align-self:stretch"></span>
+          <label class="hint"><input type="checkbox" id="tFlattenRedact" /> flatten redactions (rasterize — truly removes text underneath)</label>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <span class="hint" id="modeHint"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <h2 style="margin:0">Pages</h2>
+          <button class="btn" id="downloadBtn" disabled>Download result</button>
+        </div>
+        <div class="pages" id="pagesWrap"><div class="empty">Load a PDF above to get started.</div></div>
+      </div>
+    </section>
+
+    <!-- ============================= ENVELOPES TAB ============================= -->
+    <section id="tab-envelopes" hidden>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">Envelopes</h2>
+          <button class="btn" id="newEnvelopeBtn">＋ New envelope</button>
+        </div>
+        <table id="envTable">
+          <thead><tr><th>Document</th><th>Status</th><th>Progress</th><th>Sent</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="empty" id="envEmpty" hidden>No envelopes yet. Send your first document for signature.</div>
+      </div>
+
+      <div class="card" id="envDetailCard" hidden></div>
+    </section>
+  </main>
+</div>
+
+<!-- ============================= MODALS ============================= -->
+<div class="modal-back" id="sigModalBack" hidden>
+  <div class="modal">
+    <h3>Add a signature / initials</h3>
+    <div class="tabbtns">
+      <button data-sm="draw" class="active">Draw</button>
+      <button data-sm="type">Type</button>
+      <button data-sm="upload">Upload image</button>
+    </div>
+    <div id="sm-draw">
+      <canvas id="sigPad" width="500" height="180"></canvas>
+      <div class="row" style="margin-top:8px"><button class="btn secondary" id="sigClear">Clear</button></div>
+    </div>
+    <div id="sm-type" hidden>
+      <input type="text" id="sigTypeInput" placeholder="Type your name" style="width:100%;font-size:28px;font-family:'Brush Script MT',cursive;padding:14px" />
+    </div>
+    <div id="sm-upload" hidden>
+      <input type="file" id="sigUploadInput" accept="image/*" />
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label class="hint">Placed as: </label>
+      <select id="sigKind"><option value="signature">Signature</option><option value="initials">Initials</option></select>
+    </div>
+    <div class="foot">
+      <button class="btn secondary" id="sigCancel">Cancel</button>
+      <button class="btn" id="sigUse">Use this — now click a page to place it</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="wmModalBack" hidden>
+  <div class="modal">
+    <h3>Watermark</h3>
+    <div class="field-row"><label style="width:110px">Text</label><input type="text" id="wmText" value="DRAFT" /></div>
+    <div class="field-row"><label style="width:110px">Opacity</label><input type="range" id="wmOpacity" min="5" max="60" value="20" /></div>
+    <div class="field-row"><label style="width:110px">Angle</label><input type="number" id="wmAngle" value="-45" /></div>
+    <div class="foot"><button class="btn secondary" id="wmCancel">Cancel</button><button class="btn" id="wmApply">Apply to all pages</button></div>
+  </div>
+</div>
+
+<div class="modal-back" id="pnModalBack" hidden>
+  <div class="modal">
+    <h3>Page numbers</h3>
+    <div class="field-row"><label style="width:110px">Start at</label><input type="number" id="pnStart" value="1" /></div>
+    <div class="field-row"><label style="width:110px">Position</label>
+      <select id="pnPos"><option value="bc">Bottom center</option><option value="br">Bottom right</option><option value="tr">Top right</option></select>
+    </div>
+    <div class="foot"><button class="btn secondary" id="pnCancel">Cancel</button><button class="btn" id="pnApply">Apply</button></div>
+  </div>
+</div>
+
+<div class="modal-back" id="txtModalBack" hidden>
+  <div class="modal">
+    <h3>Add text</h3>
+    <div class="field-row"><label style="width:110px">Text</label><input type="text" id="txtValue" placeholder="e.g. Approved" /></div>
+    <div class="field-row"><label style="width:110px">Size (pt)</label><input type="number" id="txtSize" value="14" /></div>
+    <div class="foot"><button class="btn secondary" id="txtCancel">Cancel</button><button class="btn" id="txtUse">Use this — now click a page to place it</button></div>
+  </div>
+</div>
+
+<div class="modal-back" id="envModalBack" hidden>
+  <div class="modal" style="width:min(720px,94vw)">
+    <h3>New envelope</h3>
+    <div id="envStep1">
+      <div class="field-row"><label style="width:110px">Title</label><input type="text" id="envTitle" placeholder="e.g. Ridgeline — Subcontractor Agreement" /></div>
+      <div class="field-row"><label style="width:110px">PDF file</label><input type="file" id="envFile" accept="application/pdf" /></div>
+      <div class="field-row"><label style="width:110px">From name</label><input type="text" id="envSenderName" /></div>
+      <div class="field-row"><label style="width:110px">From email</label><input type="email" id="envSenderEmail" /></div>
+      <div class="field-row"><label style="width:110px">Message</label><input type="text" id="envMessage" placeholder="Optional note in the invite email" /></div>
+      <h3 style="margin-top:16px">Recipients</h3>
+      <div id="recipientsList"></div>
+      <button class="btn ghost" id="addRecipientBtn">＋ Add recipient</button>
+      <p class="hint">Recipients with the same "order" number sign in parallel; lower numbers sign first.</p>
+    </div>
+    <div id="envStep2" hidden>
+      <p class="hint">Pick a recipient below, pick a field type, then click a spot on the page to drop it there. Drag a dropped field to reposition it.</p>
+      <div class="row" id="recipientChips" style="margin-bottom:8px"></div>
+      <div class="toolbar" style="margin-bottom:10px">
+        <button class="btn secondary" data-ftype="signature">Signature</button>
+        <button class="btn secondary" data-ftype="initials">Initials</button>
+        <button class="btn secondary" data-ftype="date">Date</button>
+        <button class="btn secondary" data-ftype="text">Text</button>
+        <button class="btn secondary" data-ftype="checkbox">Checkbox</button>
+      </div>
+      <div class="pages" id="envPagesWrap"></div>
+    </div>
+    <div class="foot">
+      <button class="btn secondary" id="envCancel">Cancel</button>
+      <button class="btn secondary" id="envBack" hidden>Back</button>
+      <button class="btn" id="envNext">Next: place fields →</button>
+      <button class="btn" id="envSend" hidden>Send for signature</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script type="module">
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.worker.min.mjs";
+const { PDFDocument, degrees, rgb, StandardFonts } = window.PDFLib;
+
+// ------------------------------------------------------------------ auth
+const tokenKey = "signet_token";
+function getToken() { return localStorage.getItem(tokenKey); }
+function setToken(t) { localStorage.setItem(tokenKey, t); }
+function clearToken() { localStorage.removeItem(tokenKey); }
+
+async function api(path, opts = {}) {
+  const headers = opts.headers || {};
+  const token = getToken();
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const res = await fetch(path, { ...opts, headers });
+  if (res.status === 401) { clearToken(); showLogin(); throw new Error("Not authenticated"); }
+  if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || "Request failed"); }
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("application/json") ? res.json() : res;
+}
+
+function showLogin() {
+  document.getElementById("loginScreen").hidden = false;
+  document.getElementById("app").hidden = true;
+}
+function showApp() {
+  document.getElementById("loginScreen").hidden = true;
+  document.getElementById("app").hidden = false;
+}
+
+document.getElementById("loginBtn").onclick = async () => {
+  const password = document.getElementById("loginPassword").value;
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }),
+    });
+    if (!res.ok) throw new Error("wrong");
+    const { token } = await res.json();
+    setToken(token);
+    showApp();
+    refreshEnvelopes();
+  } catch { document.getElementById("loginErr").textContent = "Wrong password."; }
+};
+document.getElementById("logoutBtn").onclick = () => { clearToken(); showLogin(); };
+if (getToken()) showApp(); else showLogin();
+
+// ------------------------------------------------------------------ tabs
+for (const btn of document.querySelectorAll("header.top nav button")) {
+  btn.onclick = () => {
+    for (const b of document.querySelectorAll("header.top nav button")) b.classList.remove("active");
+    btn.classList.add("active");
+    document.getElementById("tab-toolkit").hidden = btn.dataset.tab !== "toolkit";
+    document.getElementById("tab-envelopes").hidden = btn.dataset.tab !== "envelopes";
+    if (btn.dataset.tab === "envelopes") refreshEnvelopes();
+  };
+}
+
+// =====================================================================
+// PDF TOOLKIT — fully client-side, no network calls
+// =====================================================================
+const tk = {
+  pdfDoc: null,        // pdf-lib PDFDocument currently being edited
+  order: [],           // array of pdf-lib page indices in display order
+  selected: new Set(), // selected display-indices
+  annos: [],           // {kind:'text'|'signature'|'watermark'|'pagenum'|'redact', pageOrderIdx, x,y,w,h, ...}
+  mode: null,          // 'text' | 'signature' | 'redact' | null
+  pendingSig: null,    // { dataUrl, kind }
+  pendingText: null,   // { text, size }
+};
+
+document.getElementById("fileInput").onchange = async (e) => {
+  const files = [...e.target.files];
+  if (!files.length) return;
+  await loadFiles(files, true);
+};
+document.getElementById("tMergeMore").onclick = () => {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "application/pdf"; inp.multiple = true;
+  inp.onchange = () => loadFiles([...inp.files], false);
+  inp.click();
+};
+
+async function loadFiles(files, replacing) {
+  if (replacing || !tk.pdfDoc) {
+    tk.pdfDoc = await PDFDocument.create();
+    tk.order = []; tk.selected.clear(); tk.annos = [];
+  }
+  for (const file of files) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const src = await PDFDocument.load(bytes);
+    const copied = await tk.pdfDoc.copyPages(src, src.getPageIndices());
+    for (const p of copied) {
+      const idx = tk.pdfDoc.getPageCount();
+      tk.pdfDoc.addPage(p);
+      tk.order.push(idx);
+    }
+  }
+  document.getElementById("toolbarCard").hidden = false;
+  document.getElementById("downloadBtn").disabled = false;
+  await renderPages();
+}
+
+async function renderPages() {
+  const bytes = await tk.pdfDoc.save();
+  const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const wrap = document.getElementById("pagesWrap");
+  wrap.innerHTML = "";
+  for (let displayIdx = 0; displayIdx < tk.order.length; displayIdx++) {
+    const pdfPageIndex = tk.order[displayIdx];
+    const page = await doc.getPage(pdfPageIndex + 1);
+    const viewport = page.getViewport({ scale: 0.35 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+
+    const card = document.createElement("div");
+    card.className = "page-card" + (tk.selected.has(displayIdx) ? " selected" : "");
+    card.draggable = true;
+    card.dataset.displayIdx = displayIdx;
+
+    const box = document.createElement("div");
+    box.style.position = "relative";
+    box.appendChild(canvas);
+
+    for (const a of tk.annos.filter((a) => a.pageOrderIdx === displayIdx)) {
+      const m = document.createElement("div");
+      m.className = "anno-marker";
+      m.style.left = a.x * 100 + "%"; m.style.top = a.y * 100 + "%";
+      m.style.width = a.w * 100 + "%"; m.style.height = a.h * 100 + "%";
+      m.textContent = a.kind === "redact" ? "" : a.kind;
+      if (a.kind === "redact") m.style.background = "rgba(0,0,0,.85)";
+      const rm = document.createElement("button");
+      rm.textContent = "×";
+      rm.onclick = (ev) => { ev.stopPropagation(); tk.annos = tk.annos.filter((x) => x !== a); renderPages(); };
+      m.appendChild(rm);
+      box.appendChild(m);
+    }
+    card.appendChild(box);
+
+    const idxRow = document.createElement("div");
+    idxRow.className = "idx";
+    idxRow.innerHTML = `<span>Page ${displayIdx + 1}</span><label><input type="checkbox" ${tk.selected.has(displayIdx) ? "checked" : ""}/> select</label>`;
+    idxRow.querySelector("input").onchange = (ev) => {
+      ev.target.checked ? tk.selected.add(displayIdx) : tk.selected.delete(displayIdx);
+      card.classList.toggle("selected", ev.target.checked);
+    };
+    card.appendChild(idxRow);
+
+    box.onclick = (ev) => handlePageClick(ev, box, displayIdx);
+    card.ondragstart = (ev) => ev.dataTransfer.setData("text/plain", displayIdx);
+    card.ondragover = (ev) => ev.preventDefault();
+    card.ondrop = (ev) => {
+      ev.preventDefault();
+      const from = Number(ev.dataTransfer.getData("text/plain"));
+      const to = displayIdx;
+      const [moved] = tk.order.splice(from, 1);
+      tk.order.splice(to, 0, moved);
+      renderPages();
+    };
+    wrap.appendChild(card);
+  }
+  document.getElementById("modeHint").textContent = tk.mode
+    ? `Click mode: ${tk.mode} — click a page to place it. Click "Add text/signature" again to cancel.`
+    : "";
+}
+
+function handlePageClick(ev, box, displayIdx) {
+  if (!tk.mode) return;
+  const rect = box.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) / rect.width;
+  const y = (ev.clientY - rect.top) / rect.height;
+  if (tk.mode === "signature" && tk.pendingSig) {
+    tk.annos.push({ kind: tk.pendingSig.kind, pageOrderIdx: displayIdx, x, y: Math.max(0, y - 0.06), w: 0.28, h: 0.1, dataUrl: tk.pendingSig.dataUrl });
+  } else if (tk.mode === "text" && tk.pendingText) {
+    tk.annos.push({ kind: "text", pageOrderIdx: displayIdx, x, y: Math.max(0, y - 0.02), w: 0.35, h: 0.05, text: tk.pendingText.text, size: tk.pendingText.size });
+  } else if (tk.mode === "redact") {
+    tk.annos.push({ kind: "redact", pageOrderIdx: displayIdx, x, y, w: 0.2, h: 0.06 });
+  }
+  renderPages();
+}
+
+document.getElementById("tRotateL").onclick = () => rotateSelected(-90);
+document.getElementById("tRotateR").onclick = () => rotateSelected(90);
+function rotateSelected(delta) {
+  const targets = tk.selected.size ? [...tk.selected] : tk.order.map((_, i) => i);
+  for (const displayIdx of targets) {
+    const page = tk.pdfDoc.getPage(tk.order[displayIdx]);
+    page.setRotation(degrees((page.getRotation().angle + delta + 360) % 360));
+  }
+  renderPages();
+}
+
+document.getElementById("tDeleteSel").onclick = () => {
+  if (!tk.selected.size) return alert("Select one or more pages first.");
+  tk.order = tk.order.filter((_, i) => !tk.selected.has(i));
+  tk.selected.clear();
+  renderPages();
+};
+
+document.getElementById("tExtractSel").onclick = async () => {
+  if (!tk.selected.size) return alert("Select one or more pages first.");
+  const newDoc = await PDFDocument.create();
+  const indices = [...tk.selected].sort((a, b) => a - b).map((i) => tk.order[i]);
+  const copied = await newDoc.copyPages(tk.pdfDoc, indices);
+  copied.forEach((p) => newDoc.addPage(p));
+  downloadBytes(await newDoc.save(), "extracted.pdf");
+};
+
+document.getElementById("tInsertBlank").onclick = () => {
+  const afterIdx = tk.selected.size ? Math.max(...tk.selected) + 1 : tk.order.length;
+  const page = tk.pdfDoc.addPage();
+  const newPdfIdx = tk.pdfDoc.getPageCount() - 1;
+  tk.order.splice(afterIdx, 0, newPdfIdx);
+  renderPages();
+};
+
+// -- watermark
+document.getElementById("tWatermark").onclick = () => (document.getElementById("wmModalBack").hidden = false);
+document.getElementById("wmCancel").onclick = () => (document.getElementById("wmModalBack").hidden = true);
+document.getElementById("wmApply").onclick = () => {
+  const text = document.getElementById("wmText").value || "DRAFT";
+  const opacity = Number(document.getElementById("wmOpacity").value) / 100;
+  const angle = Number(document.getElementById("wmAngle").value);
+  for (let i = 0; i < tk.order.length; i++) tk.annos.push({ kind: "watermark", pageOrderIdx: i, text, opacity, angle });
+  document.getElementById("wmModalBack").hidden = true;
+  renderPages();
+};
+
+// -- page numbers
+document.getElementById("tPageNum").onclick = () => (document.getElementById("pnModalBack").hidden = false);
+document.getElementById("pnCancel").onclick = () => (document.getElementById("pnModalBack").hidden = true);
+document.getElementById("pnApply").onclick = () => {
+  const start = Number(document.getElementById("pnStart").value) || 1;
+  const pos = document.getElementById("pnPos").value;
+  tk.annos = tk.annos.filter((a) => a.kind !== "pagenum");
+  for (let i = 0; i < tk.order.length; i++) tk.annos.push({ kind: "pagenum", pageOrderIdx: i, number: start + i, pos });
+  document.getElementById("pnModalBack").hidden = true;
+  renderPages();
+};
+
+// -- add text mode
+document.getElementById("tAddText").onclick = () => (document.getElementById("txtModalBack").hidden = false);
+document.getElementById("txtCancel").onclick = () => (document.getElementById("txtModalBack").hidden = true);
+document.getElementById("txtUse").onclick = () => {
+  tk.pendingText = { text: document.getElementById("txtValue").value || "Text", size: Number(document.getElementById("txtSize").value) || 14 };
+  tk.mode = "text";
+  document.getElementById("txtModalBack").hidden = true;
+  renderPages();
+};
+
+// -- redact mode (click-drop a redaction box; drag its marker to reposition via re-adding)
+document.getElementById("tRedact").onclick = () => { tk.mode = tk.mode === "redact" ? null : "redact"; renderPages(); };
+
+// -- signature modal (also used for local self-signing, not the e-sign workflow)
+const sigModal = document.getElementById("sigModalBack");
+document.getElementById("tAddSig").onclick = () => (sigModal.hidden = false);
+document.getElementById("sigCancel").onclick = () => (sigModal.hidden = true);
+for (const b of document.querySelectorAll("#sigModalBack .tabbtns button")) {
+  b.onclick = () => {
+    for (const x of document.querySelectorAll("#sigModalBack .tabbtns button")) x.classList.remove("active");
+    b.classList.add("active");
+    document.getElementById("sm-draw").hidden = b.dataset.sm !== "draw";
+    document.getElementById("sm-type").hidden = b.dataset.sm !== "type";
+    document.getElementById("sm-upload").hidden = b.dataset.sm !== "upload";
+  };
+}
+const sigPad = document.getElementById("sigPad");
+const sigCtx = sigPad.getContext("2d");
+sigCtx.lineWidth = 2.4; sigCtx.strokeStyle = "#16232f"; sigCtx.lineCap = "round";
+let drawing = false, lastPt = null;
+function ptFromEvent(ev) {
+  const r = sigPad.getBoundingClientRect();
+  const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+  const cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
+  return [cx * (sigPad.width / r.width), cy * (sigPad.height / r.height)];
+}
+sigPad.addEventListener("pointerdown", (ev) => { drawing = true; lastPt = ptFromEvent(ev); });
+sigPad.addEventListener("pointermove", (ev) => {
+  if (!drawing) return;
+  const [x, y] = ptFromEvent(ev);
+  sigCtx.beginPath(); sigCtx.moveTo(...lastPt); sigCtx.lineTo(x, y); sigCtx.stroke();
+  lastPt = [x, y];
+});
+window.addEventListener("pointerup", () => (drawing = false));
+document.getElementById("sigClear").onclick = () => sigCtx.clearRect(0, 0, sigPad.width, sigPad.height);
+
+document.getElementById("sigUse").onclick = async () => {
+  const kind = document.getElementById("sigKind").value;
+  const activeTab = document.querySelector("#sigModalBack .tabbtns button.active").dataset.sm;
+  let dataUrl;
+  if (activeTab === "draw") {
+    dataUrl = sigPad.toDataURL("image/png");
+  } else if (activeTab === "type") {
+    const name = document.getElementById("sigTypeInput").value || "Signed";
+    const c = document.createElement("canvas"); c.width = 500; c.height = 140;
+    const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, c.height);
+    cx.fillStyle = "#16232f"; cx.font = "56px 'Brush Script MT', cursive"; cx.fillText(name, 20, 90);
+    dataUrl = c.toDataURL("image/png");
+  } else {
+    const file = document.getElementById("sigUploadInput").files[0];
+    if (!file) return alert("Choose an image file first.");
+    dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
+  }
+  tk.pendingSig = { dataUrl, kind };
+  tk.mode = "signature";
+  sigModal.hidden = true;
+  renderPages();
+};
+
+function cancelModeOnRepeatClick(btnId, mode) {
+  document.getElementById(btnId).addEventListener("click", () => {
+    if (tk.mode === mode) tk.mode = null;
+  }, true);
+}
+
+document.getElementById("downloadBtn").onclick = async () => {
+  const bytes = await bakeAndExport();
+  downloadBytes(bytes, "signet-export.pdf");
+};
+
+async function bakeAndExport() {
+  // Work on a fresh copy in the current display order so structural edits (reorder,
+  // rotate, delete) already applied to tk.pdfDoc/tk.order are reflected, then draw
+  // every annotation on top.
+  const ordered = await PDFDocument.create();
+  const copied = await ordered.copyPages(tk.pdfDoc, tk.order);
+  copied.forEach((p) => ordered.addPage(p));
+
+  const font = await ordered.embedFont(StandardFonts.Helvetica);
+  const pages = ordered.getPages();
+
+  for (const a of tk.annos) {
+    const page = pages[a.pageOrderIdx];
+    if (!page) continue;
+    const { width, height } = page.getSize();
+    if (a.kind === "watermark") {
+      page.drawText(a.text, {
+        x: width * 0.15, y: height * 0.45, size: Math.min(width, height) * 0.09,
+        font, color: rgb(0.4, 0.4, 0.4), opacity: a.opacity, rotate: degrees(a.angle),
+      });
+    } else if (a.kind === "pagenum") {
+      const label = String(a.number);
+      const size = 10;
+      let x = width / 2 - 6, y = 18;
+      if (a.pos === "br") x = width - 40;
+      if (a.pos === "tr") { x = width - 40; y = height - 28; }
+      page.drawText(label, { x, y, size, font, color: rgb(0.2, 0.2, 0.2) });
+    } else if (a.kind === "redact") {
+      const x = a.x * width, w = a.w * width, h = a.h * height, y = height - a.y * height - h;
+      page.drawRectangle({ x, y, width: w, height: h, color: rgb(0, 0, 0) });
+    } else if (a.kind === "text") {
+      const x = a.x * width, yTop = a.y * height;
+      page.drawText(a.text, { x: x + 2, y: height - yTop - a.size, size: a.size, font, color: rgb(0.05, 0.05, 0.2) });
+    } else if (a.kind === "signature" || a.kind === "initials") {
+      const bytes = dataUrlToBytes(a.dataUrl);
+      const img = await ordered.embedPng(bytes).catch(() => ordered.embedJpg(bytes));
+      const w = a.w * width, h = a.h * height;
+      const scale = Math.min(w / img.width, h / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      const boxX = a.x * width, boxYtop = a.y * height;
+      const y = height - boxYtop - h;
+      page.drawImage(img, { x: boxX + (w - dw) / 2, y: y + (h - dh) / 2, width: dw, height: dh });
+    }
+  }
+
+  let bytes = await ordered.save();
+
+  if (document.getElementById("tFlattenRedact").checked && tk.annos.some((a) => a.kind === "redact")) {
+    bytes = await rasterizePdf(bytes);
+  }
+  return bytes;
+}
+
+// Rebuilds the PDF page-by-page from rendered raster images — used to truly destroy
+// the text layer under a redaction box, not just paint over it.
+async function rasterizePdf(bytes) {
+  const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const out = await PDFDocument.create();
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    const png = dataUrlToBytes(canvas.toDataURL("image/png"));
+    const img = await out.embedPng(png);
+    const p = out.addPage([viewport.width / 2, viewport.height / 2]);
+    p.drawImage(img, { x: 0, y: 0, width: viewport.width / 2, height: viewport.height / 2 });
+  }
+  return out.save();
+}
+
+function dataUrlToBytes(dataUrl) {
+  const b64 = dataUrl.split(",")[1];
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function downloadBytes(bytes, filename) {
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// cancel a click-mode by clicking its own button again
+document.getElementById("tAddText").addEventListener("click", function () { if (this._armed) tk.mode = null; this._armed = !this._armed; });
+document.getElementById("tAddSig").addEventListener("click", function () { if (this._armed) tk.mode = null; this._armed = !this._armed; });
+
+// =====================================================================
+// ENVELOPES — talks to the Worker API
+// =====================================================================
+const STATUS_LABEL = { draft: "Draft", sent: "Sent", partially_signed: "Partially signed", completed: "Completed", voided: "Voided", declined: "Declined" };
+
+async function refreshEnvelopes() {
+  try {
+    const { envelopes } = await api("/api/admin/envelopes");
+    const tbody = document.querySelector("#envTable tbody");
+    tbody.innerHTML = "";
+    document.getElementById("envEmpty").hidden = envelopes.length > 0;
+    for (const e of envelopes) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(e.title)}</td>
+        <td><span class="pill ${e.status}">${STATUS_LABEL[e.status] || e.status}</span></td>
+        <td>${e.signed_count}/${e.recipient_count} signed</td>
+        <td>${e.sent_at ? new Date(e.sent_at).toLocaleDateString() : "—"}</td>
+        <td><button class="btn ghost" data-open="${e.id}">View →</button></td>`;
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => openEnvelope(b.dataset.open)));
+  } catch (e) { console.error(e); }
+}
+
+async function openEnvelope(id) {
+  const { envelope, recipients, audit } = await api(`/api/admin/envelopes/${id}`);
+  const card = document.getElementById("envDetailCard");
+  card.hidden = false;
+  card.innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">${escapeHtml(envelope.title)}</h2>
+      <span class="pill ${envelope.status}">${STATUS_LABEL[envelope.status] || envelope.status}</span>
+    </div>
+    <h3 style="margin-top:14px">Recipients</h3>
+    <table><thead><tr><th>Name</th><th>Role</th><th>Order</th><th>Status</th><th></th></tr></thead>
+      <tbody>${recipients.map((r) => `
+        <tr><td>${escapeHtml(r.name)} <span class="hint">${escapeHtml(r.email)}</span></td><td>${r.role}</td><td>${r.sign_order}</td>
+        <td>${r.status}</td><td>${r.status !== "signed" ? `<button class="btn ghost" data-remind="${r.id}">Remind</button>` : ""}</td></tr>`).join("")}
+      </tbody></table>
+    <h3 style="margin-top:14px">Audit trail</h3>
+    <table><tbody>${audit.map((a) => `<tr><td class="hint">${new Date(a.created_at).toLocaleString()}</td><td>${a.event}</td><td class="hint">${escapeHtml(a.detail || "")}</td></tr>`).join("")}</tbody></table>
+    <div class="row" style="margin-top:14px">
+      ${envelope.status === "completed" ? `<a class="btn" href="/api/admin/envelopes/${envelope.id}/download">Download signed PDF</a>` : ""}
+      ${!["voided", "completed", "declined"].includes(envelope.status) ? `<button class="btn danger" id="voidBtn">Void envelope</button>` : ""}
+    </div>`;
+  card.querySelectorAll("[data-remind]").forEach((b) => (b.onclick = async () => { await api(`/api/admin/envelopes/${id}/remind/${b.dataset.remind}`, { method: "POST" }); alert("Reminder sent."); }));
+  const voidBtn = card.querySelector("#voidBtn");
+  if (voidBtn) voidBtn.onclick = async () => { if (confirm("Void this envelope? Signers will no longer be able to sign.")) { await api(`/api/admin/envelopes/${id}/void`, { method: "POST" }); openEnvelope(id); refreshEnvelopes(); } };
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+// ---- new envelope wizard ----
+const ev = { file: null, pdfDoc: null, recipients: [], fields: [], currentRecipient: 0, currentFieldType: "signature" };
+const envModal = document.getElementById("envModalBack");
+document.getElementById("newEnvelopeBtn").onclick = () => {
+  Object.assign(ev, { file: null, pdfDoc: null, recipients: [], fields: [], currentRecipient: 0 });
+  document.getElementById("envTitle").value = "";
+  document.getElementById("envMessage").value = "";
+  document.getElementById("recipientsList").innerHTML = "";
+  addRecipientRow();
+  document.getElementById("envStep1").hidden = false;
+  document.getElementById("envStep2").hidden = true;
+  document.getElementById("envBack").hidden = true;
+  document.getElementById("envNext").hidden = false;
+  document.getElementById("envSend").hidden = true;
+  envModal.hidden = false;
+};
+document.getElementById("envCancel").onclick = () => (envModal.hidden = true);
+
+function addRecipientRow(name = "", email = "", order = 1) {
+  const row = document.createElement("div");
+  row.className = "field-row";
+  row.innerHTML = `
+    <input type="text" placeholder="Name" class="r-name" value="${escapeHtml(name)}" />
+    <input type="email" placeholder="Email" class="r-email" value="${escapeHtml(email)}" />
+    <input type="number" placeholder="Order" class="r-order" value="${order}" style="width:70px" />
+    <select class="r-role"><option value="signer">Signer</option><option value="approver">Approver</option><option value="cc">CC only</option></select>
+    <button class="btn ghost r-remove">Remove</button>`;
+  row.querySelector(".r-remove").onclick = () => row.remove();
+  document.getElementById("recipientsList").appendChild(row);
+}
+document.getElementById("addRecipientBtn").onclick = () => addRecipientRow();
+
+document.getElementById("envNext").onclick = async () => {
+  const file = document.getElementById("envFile").files[0];
+  if (!file) return alert("Choose a PDF file.");
+  const rows = [...document.querySelectorAll("#recipientsList .field-row")];
+  const recipients = rows.map((r) => ({
+    name: r.querySelector(".r-name").value.trim(),
+    email: r.querySelector(".r-email").value.trim(),
+    order: Number(r.querySelector(".r-order").value) || 1,
+    role: r.querySelector(".r-role").value,
+  })).filter((r) => r.name && r.email);
+  if (!recipients.length) return alert("Add at least one recipient with a name and email.");
+
+  ev.file = file;
+  ev.recipients = recipients;
+  ev.fields = [];
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  ev.pdfDoc = await PDFDocument.load(bytes);
+
+  const chips = document.getElementById("recipientChips");
+  chips.innerHTML = "";
+  recipients.forEach((r, i) => {
+    const chip = document.createElement("div");
+    chip.className = "recipient-chip" + (i === 0 ? " active" : "");
+    chip.textContent = `${r.name} (${r.role})`;
+    chip.onclick = () => { ev.currentRecipient = i; [...chips.children].forEach((c) => c.classList.remove("active")); chip.classList.add("active"); };
+    chips.appendChild(chip);
+  });
+  ev.currentRecipient = 0;
+
+  document.querySelectorAll("#envStep2 [data-ftype]").forEach((b) => {
+    b.onclick = () => { document.querySelectorAll("#envStep2 [data-ftype]").forEach((x) => x.classList.remove("active")); b.classList.add("active"); ev.currentFieldType = b.dataset.ftype; };
+  });
+
+  await renderEnvPages(bytes);
+
+  document.getElementById("envStep1").hidden = true;
+  document.getElementById("envStep2").hidden = false;
+  document.getElementById("envBack").hidden = false;
+  document.getElementById("envNext").hidden = true;
+  document.getElementById("envSend").hidden = false;
+};
+
+document.getElementById("envBack").onclick = () => {
+  document.getElementById("envStep1").hidden = false;
+  document.getElementById("envStep2").hidden = true;
+  document.getElementById("envBack").hidden = true;
+  document.getElementById("envNext").hidden = false;
+  document.getElementById("envSend").hidden = true;
+};
+
+const FIELD_DEFAULT_SIZE = { signature: [0.28, 0.09], initials: [0.1, 0.06], date: [0.16, 0.04], text: [0.24, 0.04], checkbox: [0.04, 0.04] };
+const RECIPIENT_COLORS = ["#2f6fed", "#1c8a4c", "#b5760b", "#b5342f", "#7a3fb5"];
+
+async function renderEnvPages(bytes) {
+  const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const wrap = document.getElementById("envPagesWrap");
+  wrap.innerHTML = "";
+  for (let i = 0; i < doc.numPages; i++) {
+    const page = await doc.getPage(i + 1);
+    const viewport = page.getViewport({ scale: 0.45 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    const card = document.createElement("div");
+    card.className = "page-card"; card.draggable = false;
+    const box = document.createElement("div"); box.style.position = "relative"; box.appendChild(canvas);
+    card.appendChild(box);
+    const label = document.createElement("div"); label.className = "idx"; label.innerHTML = `<span>Page ${i + 1}</span>`;
+    card.appendChild(label);
+    box.onclick = (e) => placeField(e, box, i);
+    drawFieldMarkers(box, i);
+    wrap.appendChild(card);
+  }
+}
+
+function drawFieldMarkers(box, pageIdx) {
+  box.querySelectorAll(".anno-marker").forEach((n) => n.remove());
+  ev.fields.filter((f) => f.page === pageIdx).forEach((f) => {
+    const m = document.createElement("div");
+    m.className = "anno-marker";
+    m.style.left = f.x * 100 + "%"; m.style.top = f.y * 100 + "%";
+    m.style.width = f.w * 100 + "%"; m.style.height = f.h * 100 + "%";
+    m.style.borderColor = RECIPIENT_COLORS[f.recipientIndex % RECIPIENT_COLORS.length];
+    m.textContent = f.type;
+    const rm = document.createElement("button");
+    rm.textContent = "×";
+    rm.onclick = (ev2) => { ev2.stopPropagation(); ev.fields = ev.fields.filter((x) => x !== f); drawFieldMarkers(box, pageIdx); };
+    m.appendChild(rm);
+    box.appendChild(m);
+  });
+}
+
+function placeField(e, box, pageIdx) {
+  const rect = box.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  const [w, h] = FIELD_DEFAULT_SIZE[ev.currentFieldType];
+  ev.fields.push({ recipientIndex: ev.currentRecipient, type: ev.currentFieldType, page: pageIdx, x, y: Math.max(0, y - h / 2), w, h, required: true, label: ev.currentFieldType });
+  drawFieldMarkers(box, pageIdx);
+}
+
+document.getElementById("envSend").onclick = async () => {
+  if (!ev.fields.length) return alert("Place at least one field before sending.");
+  const form = new FormData();
+  form.append("title", document.getElementById("envTitle").value || "Untitled document");
+  form.append("message", document.getElementById("envMessage").value || "");
+  form.append("senderName", document.getElementById("envSenderName").value || "");
+  form.append("senderEmail", document.getElementById("envSenderEmail").value || "");
+  form.append("file", ev.file);
+  form.append("recipients", JSON.stringify(ev.recipients));
+  form.append("fields", JSON.stringify(ev.fields));
+  form.append("sendNow", "true");
+  try {
+    await api("/api/admin/envelopes", { method: "POST", body: form });
+    envModal.hidden = true;
+    refreshEnvelopes();
+  } catch (e) { alert("Couldn't send: " + e.message); }
+};
+
+if (getToken()) refreshEnvelopes();
+</script>
+</body>
+</html>
