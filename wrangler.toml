@@ -1,0 +1,32 @@
+name = "signet"
+main = "worker/index.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ---- Static frontend ----
+# Cloudflare serves any request that matches a file in ./public directly (no Worker
+# invocation, no cost). Requests that don't match a static file (i.e. everything
+# under /api/*) fall through to the Worker below.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# ---- D1 database ----
+# After `wrangler d1 create signet-db`, paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "signet-db"
+database_id = "0d016b3e-d444-46aa-9058-b86057c4e48a"
+
+# ---- R2 bucket (stores original + signed PDFs) ----
+# After `wrangler r2 bucket create signet-files`, this just needs the name.
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "signet-files"
+
+# ---- Secrets (set with `wrangler secret put NAME`, never in this file) ----
+# RESEND_API_KEY   - API key from resend.com
+# MAIL_FROM        - e.g. "Signet <sign@mail.ridgeline.construction>"
+# ADMIN_PASSWORD   - password that unlocks the sender dashboard
+# SESSION_SECRET   - random string, used to sign session tokens (openssl rand -hex 32)
+# APP_URL          - the public URL Signet is deployed at, e.g. https://signet.ridgeline.construction
