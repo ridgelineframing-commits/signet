@@ -4,9 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Signet — PDF Editor</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="./vendor/fonts.css" rel="stylesheet">
 <style>
 :root{--accent:#4f46e5;--ink:#191b1f;--ink2:#24262c;--sub:#5b6068;--sub2:#7c8089;--sub3:#9aa0a8;
 --line:#e7e8ec;--line2:#e2e3e8;--bg:#ecebef;--panel:#f7f7f9;--chip:#f2f2f5;
@@ -244,7 +242,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="./vendor/pdf-lib.min.js"></script>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

@@ -4,9 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sign document — Signet</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="./vendor/fonts.css" rel="stylesheet">
 <style>
   /* Palette mirrors the main editor (public/index.html) so the signer sees one brand. */
   :root { --accent:#4f46e5; --ink:#191b1f; --ink2:#24262c; --sub:#5b6068; --sub2:#7c8089; --line:#e7e8ec; --line2:#e2e3e8; --bg:#ecebef; --good:#17936a; --bad:#dc2b3b; }
@@ -103,10 +101,10 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="./vendor/pdf-lib.min.js"></script>
 <script type="module">
-import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.min.mjs";
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.worker.min.mjs";
+import * as pdfjsLib from "./vendor/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
 const token = new URLSearchParams(location.search).get("t");
 const state = { data: null, values: {} }; // values[fieldId] = { text, image }

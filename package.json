@@ -15,6 +15,8 @@
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
+    "@fontsource/hanken-grotesk": "^5.2.8",
+    "pdfjs-dist": "^6.1.200",
     "wrangler": "^3.90.0"
   }
 }
