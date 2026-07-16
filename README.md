@@ -119,6 +119,12 @@ setup needed for that half) or create a test envelope addressed to yourself unde
 
 ## Notes & honest limitations
 
+- **Email OTP for signing (optional).** When creating a signature request you can tick
+  "Require each signer to verify a one-time code." Each signer must then request a 6-digit code
+  (emailed to them) and enter it before they can sign; the code is stored only as a salted
+  SHA-256 hash and expires in 10 minutes. This needs Resend configured — Signet refuses to
+  create an OTP-required envelope when email isn't set up, so signers can never be locked out.
+  Adds columns via `migrations/001_add_otp.sql` (`npm run db:migrate:otp` against the live DB).
 - **Auth is single-password, single-tenant.** There's one shared `ADMIN_PASSWORD` for whoever
   sends envelopes — fine for you and your team sharing one login, not built for
   customer-facing multi-account use. Say the word if you want real per-user accounts later.

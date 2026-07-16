@@ -20,7 +20,8 @@ CREATE TABLE envelopes (
   sent_at       TEXT,
   completed_at  TEXT,
   voided_at     TEXT,
-  message       TEXT                    -- optional note included in the invite email
+  message       TEXT,                   -- optional note included in the invite email
+  require_otp   INTEGER NOT NULL DEFAULT 0  -- 1 = signers must verify an emailed code before signing
 );
 
 CREATE TABLE recipients (
@@ -38,7 +39,10 @@ CREATE TABLE recipients (
   declined_at   TEXT,
   decline_reason TEXT,
   ip_hash       TEXT,
-  user_agent    TEXT
+  user_agent    TEXT,
+  otp_hash      TEXT,                    -- SHA-256 of the current email verification code
+  otp_expires   TEXT,                    -- ISO expiry for the code
+  otp_verified  INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE fields (

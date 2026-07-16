@@ -7,9 +7,10 @@ import {
   sendSignedNotice,
   sendDeclinedNotice,
   sendCompletedPacket,
+  sendOtpCode,
 } from "./lib/email.js";
 import { flattenEnvelope, appendCertificatePage } from "./lib/pdf.js";
-import { uuid, newToken, hashIp, nowIso, jsonError } from "./lib/util.js";
+import { uuid, newToken, hashIp, nowIso, jsonError, sha256Hex } from "./lib/util.js";
 
 const app = new Hono();
 
@@ -40,9 +41,15 @@ admin.post("/envelopes", async (c) => {
   const file = form.get("file");
   const recipients = JSON.parse(form.get("recipients") || "[]");
   const fields = JSON.parse(form.get("fields") || "[]");
+  const requireOtp = form.get("requireOtp") === "true";
 
   if (!file) return jsonError("Missing PDF file");
   if (!recipients.length) return jsonError("Add at least one recipient");
+  // OTP codes are delivered by email, so requiring OTP without email configured would lock
+  // signers out. Reject that combination up front.
+  if (requireOtp && !c.env.RESEND_API_KEY) {
+    return jsonError("Configure email (Resend) before requiring OTP verification — otherwise signers can't receive codes.");
+  }
 
   const envelopeId = uuid();
   const originalBytes = new Uint8Array(await file.arrayBuffer());
@@ -57,10 +64,10 @@ admin.post("/envelopes", async (c) => {
   const db = c.env.DB;
   await db
     .prepare(
-      `INSERT INTO envelopes (id, title, status, original_key, page_count, sender_name, sender_email, message)
-       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?)`
+      `INSERT INTO envelopes (id, title, status, original_key, page_count, sender_name, sender_email, message, require_otp)
+       VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?)`
     )
-    .bind(envelopeId, title, originalKey, pageCount, senderName, senderEmail, message)
+    .bind(envelopeId, title, originalKey, pageCount, senderName, senderEmail, message, requireOtp ? 1 : 0)
     .run();
 
   const recipientIdByIndex = [];
@@ -177,12 +184,47 @@ app.get("/api/sign/:token", async (c) => {
     .all();
 
   return c.json({
-    envelope: { id: envelope.id, title: envelope.title, message: envelope.message, page_count: envelope.page_count, status: envelope.status },
-    recipient: { id: recipient.id, name: recipient.name, email: recipient.email, role: recipient.role, status: recipient.status },
+    envelope: { id: envelope.id, title: envelope.title, message: envelope.message, page_count: envelope.page_count, status: envelope.status, requireOtp: !!envelope.require_otp },
+    recipient: { id: recipient.id, name: recipient.name, email: maskEmail(recipient.email), role: recipient.role, status: recipient.status, otpVerified: !!recipient.otp_verified },
     fields,
     otherRecipients: allRecipients,
     pdfUrl: `/api/sign/${token}/pdf`,
   });
+});
+
+// Request an email OTP for this signer (only meaningful when the envelope requires it).
+app.post("/api/sign/:token/otp", async (c) => {
+  const token = c.req.param("token");
+  const db = c.env.DB;
+  const recipient = await db.prepare(`SELECT * FROM recipients WHERE token = ?`).bind(token).first();
+  if (!recipient) return jsonError("Invalid or expired link", 404);
+  const envelope = await db.prepare(`SELECT * FROM envelopes WHERE id = ?`).bind(recipient.envelope_id).first();
+  if (!envelope) return jsonError("Not found", 404);
+  if (!envelope.require_otp) return c.json({ required: false });
+  if (recipient.status === "signed") return jsonError("You've already signed this document");
+
+  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
+  const otpHash = await sha256Hex(code + ":" + token);
+  const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  await db.prepare(`UPDATE recipients SET otp_hash = ?, otp_expires = ?, otp_verified = 0 WHERE id = ?`).bind(otpHash, expires, recipient.id).run();
+  await sendOtpCode(c.env, { envelope, recipient, code });
+  await logEvent(db, envelope.id, recipient.id, "otp_sent", "");
+  return c.json({ required: true, sent: true, to: maskEmail(recipient.email) });
+});
+
+app.post("/api/sign/:token/verify-otp", async (c) => {
+  const token = c.req.param("token");
+  const { code } = await c.req.json().catch(() => ({}));
+  const db = c.env.DB;
+  const recipient = await db.prepare(`SELECT * FROM recipients WHERE token = ?`).bind(token).first();
+  if (!recipient) return jsonError("Invalid or expired link", 404);
+  if (!recipient.otp_hash || !recipient.otp_expires) return jsonError("Request a code first");
+  if (new Date(recipient.otp_expires).getTime() < Date.now()) return jsonError("That code has expired — request a new one");
+  const attempt = await sha256Hex(String(code || "").trim() + ":" + token);
+  if (attempt !== recipient.otp_hash) return jsonError("Incorrect code");
+  await db.prepare(`UPDATE recipients SET otp_verified = 1 WHERE id = ?`).bind(recipient.id).run();
+  await logEvent(db, recipient.envelope_id, recipient.id, "otp_verified", "");
+  return c.json({ ok: true });
 });
 
 app.get("/api/sign/:token/pdf", async (c) => {
@@ -226,6 +268,9 @@ app.post("/api/sign/:token", async (c) => {
   const envelope = await db.prepare(`SELECT * FROM envelopes WHERE id = ?`).bind(recipient.envelope_id).first();
   if (!envelope || ["voided", "declined", "completed"].includes(envelope.status)) {
     return jsonError("This document is no longer available for signing");
+  }
+  if (envelope.require_otp && !recipient.otp_verified) {
+    return jsonError("Please verify the code we emailed you before signing", 403);
   }
 
   const { results: myFields } = await db
@@ -288,6 +333,14 @@ app.notFound((c) => jsonError("Not found", 404));
 // -----------------------------------------------------------------------------
 // Shared helpers
 // -----------------------------------------------------------------------------
+
+// Mask an email for display: "jane.doe@example.com" -> "ja***@example.com".
+function maskEmail(email) {
+  const [user, domain] = String(email || "").split("@");
+  if (!domain) return email;
+  const shown = user.slice(0, 2);
+  return `${shown}${"*".repeat(Math.max(1, user.length - 2))}@${domain}`;
+}
 
 async function logEvent(db, envelopeId, recipientId, event, detail) {
   await db

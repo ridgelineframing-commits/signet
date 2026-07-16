@@ -7,24 +7,27 @@ async function send(env, { to, subject, html }) {
     console.warn("RESEND_API_KEY not set — skipping email send:", subject, "->", to);
     return { skipped: true };
   }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      from: env.MAIL_FROM || "Signet <onboarding@resend.dev>",
-      to,
-      subject,
-      html,
-    }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Resend send failed:", res.status, text);
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        from: env.MAIL_FROM || "Signet <onboarding@resend.dev>",
+        to,
+        subject,
+        html,
+      }),
+    });
+    if (!res.ok) console.error("Resend send failed:", res.status, await res.text().catch(() => ""));
+    return { ok: res.ok };
+  } catch (e) {
+    // Never let a mail outage bubble up and 500 a request — signing/OTP routes must still respond.
+    console.error("Resend send threw:", e?.message || e);
+    return { ok: false, error: String(e?.message || e) };
   }
-  return res;
 }
 
 // Escape any value that lands in an HTML email body. Several of these come from
@@ -76,6 +79,16 @@ export async function sendDeclinedNotice(env, { envelope, recipient, reason }) {
     ${reason ? `<p style="color:#8a2b2b">Reason: ${esc(reason)}</p>` : ""}
   `);
   return send(env, { to: envelope.sender_email, subject: `Declined: ${envelope.title}`, html });
+}
+
+export async function sendOtpCode(env, { envelope, recipient, code }) {
+  const html = wrap(`
+    <h2 style="margin-bottom:4px">Your verification code</h2>
+    <p style="color:#4a5a68">Enter this code to sign <strong>${esc(envelope.title)}</strong>:</p>
+    <p style="font-size:30px;font-weight:700;letter-spacing:6px;margin:18px 0">${esc(code)}</p>
+    <p style="font-size:13px;color:#8a97a3">The code expires in 10 minutes. If you didn't request it, you can ignore this email.</p>
+  `);
+  return send(env, { to: recipient.email, subject: `Your code to sign: ${envelope.title}`, html });
 }
 
 export async function sendCompletedPacket(env, { envelope, downloadUrl, to }) {
