@@ -39,19 +39,10 @@ export function jsonError(message, status = 400) {
   });
 }
 
-// base64 <-> Uint8Array, used for PDF bytes and signature images crossing the JSON API
+// base64 -> Uint8Array, used to decode signature images crossing the JSON API
 export function base64ToBytes(b64) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
-}
-
-export function bytesToBase64(bytes) {
-  let bin = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(bin);
 }

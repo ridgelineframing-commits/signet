@@ -71,6 +71,7 @@ async function loadFiles(files, replacing) {
   $("addPagesBtn").hidden = false;
   $("docTitleLbl").textContent = tk.fileName || "Untitled document";
   $("pageCountChip").hidden = false;
+  invalidateRender();
   await fullRerender();
 }
 
@@ -95,6 +96,22 @@ $("canvasScroll").addEventListener("drop", async (e) => {
 });
 
 // ------------------------------------------------------------------ render engine
+// Rendering (thumbnails + main canvas) reads through pdf.js, which needs the
+// serialized bytes of the working document. Serializing + re-parsing on every
+// navigation is expensive, so we cache the parsed pdf.js document and only rebuild
+// it when the underlying pages actually change (invalidateRender). Reordering or
+// navigating pages doesn't change the bytes — it just picks a different page — so
+// those paths reuse the cache.
+async function getRenderDoc() {
+  if (!tk._renderDoc || tk._renderDirty) {
+    const bytes = await tk.pdfDoc.save();
+    tk._renderDoc = await pdfjsLib.getDocument({ data: bytes }).promise;
+    tk._renderDirty = false;
+  }
+  return tk._renderDoc;
+}
+function invalidateRender() { tk._renderDirty = true; }
+
 async function fullRerender() {
   await renderThumbs();
   clampPage();
@@ -107,8 +124,7 @@ async function renderThumbs() {
   const list = $("thumbList");
   list.innerHTML = "";
   if (!hasDoc()) return;
-  const bytes = await tk.pdfDoc.save();
-  const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const doc = await getRenderDoc();
   for (let i = 0; i < tk.order.length; i++) {
     const page = await doc.getPage(tk.order[i] + 1);
     const viewport = page.getViewport({ scale: 0.26 });
@@ -138,8 +154,14 @@ async function renderThumbs() {
   }
 }
 
-// lighter re-render used on page navigation (skips full thumb rebuild for annotation-only cases)
-async function fullRerenderLight() { clampPage(); await renderCurrentPage(); updatePageNav(); await renderThumbs(); }
+// Lighter re-render for page navigation: the thumbnails don't change, so we just
+// move the "current" highlight instead of rebuilding and re-rasterizing them all.
+async function fullRerenderLight() { clampPage(); await renderCurrentPage(); updatePageNav(); highlightCurrentThumb(); }
+function highlightCurrentThumb() {
+  for (const btn of $("thumbList").querySelectorAll(".thumb")) {
+    btn.classList.toggle("current", Number(btn.dataset.idx) === tk.currentPage);
+  }
+}
 
 function clampPage() {
   if (!hasDoc()) { tk.currentPage = 0; return; }
@@ -147,19 +169,16 @@ function clampPage() {
   if (tk.currentPage < 0) tk.currentPage = 0;
 }
 
-let currentPageCanvasSize = { w: 0, h: 0 };
 async function renderCurrentPage() {
   const shell = $("pageShell");
   shell.innerHTML = "";
   if (!hasDoc()) return;
-  const bytes = await tk.pdfDoc.save();
-  const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+  const doc = await getRenderDoc();
   const page = await doc.getPage(tk.order[tk.currentPage] + 1);
   const viewport = page.getViewport({ scale: 1.4 });
   const canvas = document.createElement("canvas");
   canvas.width = viewport.width; canvas.height = viewport.height;
   await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-  currentPageCanvasSize = { w: viewport.width, h: viewport.height };
 
   const box = document.createElement("div");
   box.className = "pagebox";
@@ -457,6 +476,7 @@ function buildOrganizePanel(body) {
 function rotateCurrent(delta) {
   const page = tk.pdfDoc.getPage(tk.order[tk.currentPage]);
   page.setRotation(degrees((page.getRotation().angle + delta + 360) % 360));
+  invalidateRender();
   fullRerender();
 }
 async function duplicateCurrent() {
@@ -464,6 +484,7 @@ async function duplicateCurrent() {
   const [copied] = await tk.pdfDoc.copyPages(tk.pdfDoc, [idx]);
   const newIdx = tk.pdfDoc.getPageCount(); tk.pdfDoc.addPage(copied);
   tk.order.splice(tk.currentPage + 1, 0, newIdx);
+  invalidateRender();
   fullRerender();
 }
 function deleteCurrent() {
@@ -479,9 +500,10 @@ async function extractCurrent() {
   downloadBytes(await newDoc.save(), "page-" + (tk.currentPage + 1) + ".pdf");
 }
 function insertBlankAfterCurrent() {
-  const page = tk.pdfDoc.addPage();
+  tk.pdfDoc.addPage();
   const newIdx = tk.pdfDoc.getPageCount() - 1;
   tk.order.splice(tk.currentPage + 1, 0, newIdx);
+  invalidateRender();
   fullRerender();
 }
 
@@ -564,6 +586,7 @@ async function flattenNow() {
   tk.pdfDoc = await PDFDocument.load(rasterized);
   tk.order = tk.pdfDoc.getPageIndices();
   tk.annos = [];
+  invalidateRender();
   await fullRerender();
   alert("Redactions applied and flattened — the underlying content is permanently removed.");
 }

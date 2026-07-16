@@ -3,16 +3,18 @@
 A self-hosted PDF toolkit + e-signature app — the DocuSign-style piece you asked for, kept
 separate from Yardstick. Runs entirely on your own Cloudflare account.
 
-- **PDF Toolkit tab** — merge, split, reorder/delete/rotate pages, extract pages, insert
+- **PDF editor** — an Adobe-style 3-pane editor (tool rail, page thumbnails, zoomable canvas,
+  contextual properties panel). Merge, reorder/delete/rotate pages, extract pages, insert
   blank pages, watermark, page numbers, click-to-place text, draw/type/upload a signature to
   stamp on a document yourself, and redaction (with an optional "flatten" mode that rasterizes
   the page so the text underneath is truly gone, not just painted over). 100% client-side —
-  nothing you edit here touches the network.
-- **Envelopes tab** — upload a PDF, add recipients with a signing order, drop signature/
-  initials/date/text/checkbox fields onto the pages per recipient, send. Recipients get an
-  emailed link (no login) to review and sign. Once everyone's signed, Signet stamps every
-  field onto the PDF, appends a certificate-of-completion page (who signed, when, hashed IP),
-  and emails the finished document to everyone.
+  nothing you edit here touches the network until you Download or Send.
+- **Send for signature** — from the editor, add recipients with a signing order, drop
+  signature/initials/date/text/checkbox fields onto the pages per recipient, and send.
+  Recipients get an emailed link (no login) to review and sign. Once everyone's signed, Signet
+  stamps every field onto the PDF, appends a certificate-of-completion page (who signed, when,
+  hashed IP), and emails the finished document to everyone. Track status in the **Requests**
+  drawer.
 
 ## Architecture
 
@@ -40,12 +42,15 @@ wrangler login          # opens a browser, authorizes wrangler against your Clou
 
 **2. Create the D1 database**
 
+> Already provisioned for the live deployment — `wrangler.toml` has the real `database_id` and
+> the schema is migrated. These steps are only for standing up a fresh copy from scratch.
+
 ```bash
 wrangler d1 create signet-db
 ```
 
-This prints a `database_id` — paste it into `wrangler.toml` in place of
-`REPLACE_WITH_D1_DATABASE_ID`. Then load the schema:
+This prints a `database_id` — paste it into `wrangler.toml` under `[[d1_databases]]`. Then load
+the schema:
 
 ```bash
 npm run db:migrate
