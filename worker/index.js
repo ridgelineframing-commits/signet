@@ -9,7 +9,7 @@ import {
   sendCompletedPacket,
 } from "./lib/email.js";
 import { flattenEnvelope, appendCertificatePage } from "./lib/pdf.js";
-import { uuid, newToken, hashIp, nowIso, jsonError, base64ToBytes, bytesToBase64 } from "./lib/util.js";
+import { uuid, newToken, hashIp, nowIso, jsonError } from "./lib/util.js";
 
 const app = new Hono();
 
@@ -145,13 +145,6 @@ admin.get("/envelopes/:id/download", async (c) => {
 });
 
 app.route("/api/admin", admin);
-
-// ---------------------------------------------------------------------------
-// Public: file passthrough used by the client-side PDF toolkit only for
-// re-downloading things it just generated in-browser is not needed (that tab
-// never touches the network) — this route exists solely so the signer page
-// and dashboard can render PDFs stored in R2 without exposing bucket listing.
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Public: signer flow (token-gated, no login)
@@ -407,11 +400,18 @@ async function completeEnvelope(env, envelope, recipients) {
     .run();
   await logEvent(db, envelope.id, null, "completed", "");
 
-  const downloadUrl = `${env.APP_URL}/api/sign/${recipients[0]?.token || ""}/final`; // see route below
-  const recipientEmails = [...new Set(recipients.map((r) => r.email))];
-  if (envelope.sender_email) recipientEmails.push(envelope.sender_email);
-  for (const to of recipientEmails) {
-    await sendCompletedPacket(env, { envelope, downloadUrl, to });
+  // Email everyone the finished packet. Each recipient gets a link tied to their
+  // own token; the sender (who has no token of their own) reuses the first
+  // recipient's — the /final route accepts any valid token for this envelope.
+  const finalUrl = (token) => `${env.APP_URL}/api/sign/${token}/final`;
+  const sent = new Set();
+  for (const r of recipients) {
+    if (!r.email || sent.has(r.email)) continue;
+    sent.add(r.email);
+    await sendCompletedPacket(env, { envelope, downloadUrl: finalUrl(r.token), to: r.email });
+  }
+  if (envelope.sender_email && !sent.has(envelope.sender_email)) {
+    await sendCompletedPacket(env, { envelope, downloadUrl: finalUrl(recipients[0]?.token || ""), to: envelope.sender_email });
   }
 }
 

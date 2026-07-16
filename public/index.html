@@ -4,9 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Signet — PDF Editor</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="./vendor/fonts.css" rel="stylesheet">
 <style>
 :root{--accent:#4f46e5;--ink:#191b1f;--ink2:#24262c;--sub:#5b6068;--sub2:#7c8089;--sub3:#9aa0a8;
 --line:#e7e8ec;--line2:#e2e3e8;--bg:#ecebef;--panel:#f7f7f9;--chip:#f2f2f5;
@@ -52,6 +50,7 @@ nav.rail{flex:0 0 60px;background:#fff;border-right:1px solid var(--line);displa
 nav.rail .railbtn{width:44px;height:44px;border:none;border-radius:9px;color:var(--sub);background:transparent;display:flex;align-items:center;justify-content:center;}
 nav.rail .railbtn:hover{background:var(--chip);}
 nav.rail .railbtn.active{background:var(--accent);color:#fff;box-shadow:0 2px 9px rgba(79,70,229,.34);}
+nav.rail .railbtn svg{width:22px;height:22px;display:block;}
 nav.rail .raildiv{width:28px;height:1px;background:#eeeef1;margin:5px 0;}
 
 aside.thumbs{flex:0 0 172px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:14px 0 20px;}
@@ -98,7 +97,11 @@ aside.props{flex:0 0 300px;background:#fff;border-left:1px solid var(--line);ove
 .tabbtns button{flex:1;background:var(--chip);border:none;padding:8px 0;border-radius:7px;font-size:12.5px;}
 .tabbtns button.active{background:var(--ink);color:#fff;}
 .marker{position:absolute;border:1.5px dashed var(--accent);background:rgba(79,70,229,.1);font-size:9px;color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.marker .x{position:absolute;top:-8px;right:-8px;width:16px;height:16px;border-radius:50%;border:none;background:var(--bad);color:#fff;font-size:10px;line-height:1;}
+.textmarker{font-family:Helvetica,Arial,sans-serif;cursor:text;min-width:6px;z-index:3;}
+.edittext{position:absolute;white-space:pre-wrap;overflow:hidden;outline:none;line-height:1.05;font-family:Helvetica,Arial,sans-serif;color:#0d0d14;cursor:text;box-sizing:border-box;padding:0 1px;z-index:3;}
+.edittext:focus{box-shadow:0 0 0 1.5px var(--accent);background:#fff !important;color:#0d0d14 !important;}
+.x{position:absolute;width:16px;height:16px;border-radius:50%;border:none;background:var(--bad);color:#fff;font-size:10px;line-height:1;z-index:6;padding:0;}
+.marker .x{top:-8px;right:-8px;}
 canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;touch-action:none;background:#fbfbfc;width:100%;}
 
 .modalback{position:fixed;inset:0;background:rgba(18,20,28,.5);display:flex;align-items:center;justify-content:center;z-index:60;padding:24px;}
@@ -150,17 +153,35 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 
   <div class="body-flex">
     <nav class="rail" id="toolRail">
-      <button class="railbtn active" data-tool="select" title="Select">&#9650;</button>
+      <button class="railbtn active" data-tool="select" title="Select">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l14 6-6 2-2 6z"/></svg></button>
+      <button class="railbtn" data-tool="hand" title="Hand — pan around">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v17M3.5 12h17M12 3.5l-2.4 2.4M12 3.5l2.4 2.4M12 20.5l-2.4-2.4M12 20.5l2.4-2.4M3.5 12l2.4-2.4M3.5 12l2.4 2.4M20.5 12l-2.4-2.4M20.5 12l-2.4 2.4"/></svg></button>
       <div class="raildiv"></div>
-      <button class="railbtn" data-tool="text" title="Text">T</button>
-      <button class="railbtn" data-tool="signature" title="Signature / initials">&#9997;</button>
-      <button class="railbtn" data-tool="highlight" title="Highlight">&#9646;</button>
+      <button class="railbtn" data-tool="text" title="Text">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5h12M12 5v14M9.5 19h5"/></svg></button>
+      <button class="railbtn" data-tool="edittext" title="Edit text (OCR)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10.5h8M4 15h9"/><path d="M14.5 19.5l5-5 2 2-5 5h-2z"/></svg></button>
+      <button class="railbtn" data-tool="signature" title="Signature / initials">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15c2.5 0 3-5 5.5-5s2 4 4 4 2.5-4 4.5-4"/><path d="M3 20h18"/></svg></button>
+      <button class="railbtn" data-tool="draw" title="Draw (freehand)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3.5-1L19 7.5a1.8 1.8 0 0 0-2.5-2.5L5 16.5z"/><path d="M14.5 6.5l3 3"/></svg></button>
+      <button class="railbtn" data-tool="shape" title="Shapes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="10.5" height="10.5" rx="1"/><circle cx="15.5" cy="15.5" r="4.5"/></svg></button>
+      <button class="railbtn" data-tool="highlight" title="Highlight">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5.5l5.5 5.5-6.5 6.5H7l-1.5-4z"/><path d="M4 21h16"/></svg></button>
+      <button class="railbtn" data-tool="image" title="Insert image">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg></button>
       <div class="raildiv"></div>
-      <button class="railbtn" data-tool="redact" title="Redact">&#9608;</button>
-      <button class="railbtn" data-tool="watermark" title="Watermark">W</button>
-      <button class="railbtn" data-tool="pagenum" title="Page numbers">#</button>
+      <button class="railbtn" data-tool="redact" title="Redact">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="9" width="16" height="6" rx="1"/></svg></button>
+      <button class="railbtn" data-tool="watermark" title="Watermark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(-10 12 12)"><rect x="4" y="7" width="16" height="10" rx="1" stroke-dasharray="3 2.5"/><path d="M8 10l1.4 4 2.6-4 2.6 4 1.4-4"/></g></svg></button>
+      <button class="railbtn" data-tool="pagenum" title="Page numbers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 4L8 20M16 4l-1.5 16M5 9h14M4 15h14"/></svg></button>
       <div class="raildiv"></div>
-      <button class="railbtn" data-tool="organize" title="Organize pages">&#9638;</button>
+      <button class="railbtn" data-tool="organize" title="Organize pages">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="12" height="15" rx="1.5"/><path d="M4 7v11a2 2 0 0 0 2 2h9"/></svg></button>
     </nav>
 
     <aside class="thumbs" id="thumbRail">
@@ -244,7 +265,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="./vendor/pdf-lib.min.js"></script>
 <script type="module" src="./app.js"></script>
 </body>
 </html>

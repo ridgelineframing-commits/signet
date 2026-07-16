@@ -4,7 +4,7 @@
 // draws them over a pdf.js canvas); pdf-lib's origin is bottom-left, so we flip y here.
 
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { base64ToBytes, bytesToBase64 } from "./util.js";
+import { base64ToBytes } from "./util.js";
 
 function toPdfBox(page, field) {
   const { width, height } = page.getSize();
@@ -131,10 +131,3 @@ export async function appendCertificatePage(pdfBytes, { envelope, recipients, au
 
   return pdfDoc.save();
 }
-
-export async function rasterizeInfo(bytes) {
-  const pdfDoc = await PDFDocument.load(bytes);
-  return { pageCount: pdfDoc.getPageCount() };
-}
-
-export { bytesToBase64 };

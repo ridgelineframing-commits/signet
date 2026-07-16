@@ -15,6 +15,11 @@
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
+    "@fontsource/hanken-grotesk": "^5.2.8",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "pdfjs-dist": "^6.1.200",
+    "tesseract.js": "^5.1.1",
+    "tesseract.js-core": "^5.1.1",
     "wrangler": "^3.90.0"
   }
 }

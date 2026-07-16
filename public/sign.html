@@ -4,45 +4,49 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Sign document — Signet</title>
+<link href="./vendor/fonts.css" rel="stylesheet">
 <style>
-  :root { --ink:#16232f; --sub:#5c6b78; --line:#dfe5ea; --bg:#f5f7f9; --brand:#1a2b3c; --brand-2:#2f6fed; --good:#1c8a4c; --bad:#b5342f; }
+  /* Palette mirrors the main editor (public/index.html) so the signer sees one brand. */
+  :root { --accent:#4f46e5; --ink:#191b1f; --ink2:#24262c; --sub:#5b6068; --sub2:#7c8089; --line:#e7e8ec; --line2:#e2e3e8; --bg:#ecebef; --good:#17936a; --bad:#dc2b3b; }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:"Segoe UI",Arial,sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:var(--brand); color:#fff; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
-  header .brand { font-weight:700; }
-  header .doc-title { font-size:13px; color:#c8d5e2; }
+  body { margin:0; font-family:'Hanken Grotesk',system-ui,sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
+  header { background:#fff; color:var(--ink); border-bottom:1px solid var(--line); padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+  header .brand { font-weight:700; font-size:19px; letter-spacing:-.01em; }
+  header .brand span { color:var(--accent); }
+  header .doc-title { font-size:13px; color:var(--sub2); }
   main { max-width:900px; margin:0 auto; padding:20px 16px 100px; }
-  .banner { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:16px; font-size:13.5px; color:var(--sub); }
-  .page-wrap { position:relative; margin:0 auto 18px; border:1px solid var(--line); background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .banner { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; font-size:13.5px; color:var(--sub); line-height:1.5; }
+  .page-wrap { position:relative; margin:0 auto 18px; border:1px solid var(--line); background:#fff; box-shadow:0 6px 26px rgba(20,22,30,.1); }
   .page-wrap canvas { display:block; width:100%; }
-  .field { position:absolute; border:2px solid var(--brand-2); background:rgba(47,111,237,.08); border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; }
-  .field.filled { border-color:var(--good); background:rgba(28,138,76,.08); }
+  .field { position:absolute; border:2px solid var(--accent); background:rgba(79,70,229,.08); border-radius:5px; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; }
+  .field.filled { border-color:var(--good); background:rgba(23,147,106,.08); }
   .field img { max-width:100%; max-height:100%; }
-  .field input[type=text] { border:none; background:transparent; width:100%; height:100%; padding:2px 4px; font-size:13px; }
-  .field .placeholder { font-size:10.5px; color:var(--brand-2); pointer-events:none; }
+  .field input[type=text] { border:none; background:transparent; width:100%; height:100%; padding:2px 4px; font-size:13px; font-family:inherit; }
+  .field .placeholder { font-size:10.5px; color:var(--accent); pointer-events:none; }
   .field.filled .placeholder { display:none; }
-  .field input[type=checkbox] { width:18px; height:18px; }
+  .field input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); }
 
   .footbar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
-  .btn { background:var(--brand-2); color:#fff; border:none; padding:11px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; }
-  .btn.secondary { background:#eef2f6; color:var(--ink); }
-  .btn.danger { background:#fdecea; color:var(--bad); }
+  .btn { background:var(--accent); color:#fff; border:none; padding:11px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; box-shadow:0 1px 2px rgba(79,70,229,.35); }
+  .btn:hover:not(:disabled) { filter:brightness(1.06); }
+  .btn.secondary { background:var(--chip,#f2f2f5); color:var(--ink2); box-shadow:none; }
+  .btn.danger { background:#fbf5f5; color:var(--bad); box-shadow:none; }
   .btn:disabled { opacity:.45; cursor:not-allowed; }
 
-  .modal-back { position:fixed; inset:0; background:rgba(10,16,22,.55); display:flex; align-items:center; justify-content:center; z-index:50; }
-  .modal { background:#fff; border-radius:12px; padding:22px; width:min(520px,92vw); }
+  .modal-back { position:fixed; inset:0; background:rgba(18,20,28,.5); display:flex; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal { background:#fff; border-radius:16px; padding:22px; width:min(520px,100%); box-shadow:0 24px 70px rgba(0,0,0,.32); }
   .modal h3 { margin:0 0 14px; }
   .tabbtns { display:flex; gap:6px; margin-bottom:12px; }
-  .tabbtns button { background:#eef2f6; border:none; padding:7px 14px; border-radius:7px; cursor:pointer; font-size:13px; }
-  .tabbtns button.active { background:var(--brand); color:#fff; }
-  canvas#sigPad { border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; }
+  .tabbtns button { flex:1; background:#f2f2f5; border:none; padding:8px 14px; border-radius:7px; cursor:pointer; font-size:13px; font-family:inherit; }
+  .tabbtns button.active { background:var(--ink); color:#fff; }
+  canvas#sigPad { border:1px solid var(--line2); border-radius:8px; width:100%; touch-action:none; background:#fbfbfc; cursor:crosshair; }
   .foot { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-  textarea { width:100%; border:1px solid var(--line); border-radius:7px; padding:8px; font-size:13.5px; }
+  textarea { width:100%; border:1px solid var(--line2); border-radius:8px; padding:8px; font-size:13.5px; font-family:inherit; }
 
   #centerState { min-height:80vh; display:flex; align-items:center; justify-content:center; text-align:center; padding:20px; }
-  #centerState .box { max-width:420px; }
-  #centerState h2 { margin-bottom:6px; }
-  #centerState p { color:var(--sub); }
+  #centerState .box { max-width:420px; background:#fff; padding:40px 32px; border-radius:16px; box-shadow:0 6px 26px rgba(20,22,30,.1); }
+  #centerState h2 { margin:0 0 6px; }
+  #centerState p { color:var(--sub); margin:0; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -51,8 +55,8 @@
 
 <div id="signApp" hidden>
   <header>
-    <div><div class="brand">Signet</div><div class="doc-title" id="docTitle"></div></div>
-    <div id="progressLabel" style="font-size:12.5px;color:#c8d5e2"></div>
+    <div><div class="brand">Signet<span>.</span></div><div class="doc-title" id="docTitle"></div></div>
+    <div id="progressLabel" style="font-size:12.5px;color:var(--sub2)"></div>
   </header>
   <main>
     <div class="banner" id="banner"></div>
@@ -97,10 +101,10 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="./vendor/pdf-lib.min.js"></script>
 <script type="module">
-import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.min.mjs";
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.1.200/pdf.worker.min.mjs";
+import * as pdfjsLib from "./vendor/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendor/pdf.worker.min.mjs";
 
 const token = new URLSearchParams(location.search).get("t");
 const state = { data: null, values: {} }; // values[fieldId] = { text, image }

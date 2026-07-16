@@ -1,0 +1,32 @@
+/* Hanken Grotesk (latin) — self-hosted, vendored from @fontsource/hanken-grotesk.
+   Replaces the runtime dependency on fonts.googleapis.com / fonts.gstatic.com so the
+   app renders its intended type with no external requests. Only the weights the UI
+   uses (400/500/600/700) are bundled. See vendor/README.md for how to re-vendor. */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(./fonts/hanken-grotesk-latin-400-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url(./fonts/hanken-grotesk-latin-500-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url(./fonts/hanken-grotesk-latin-600-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(./fonts/hanken-grotesk-latin-700-normal.woff2) format('woff2');
+}
