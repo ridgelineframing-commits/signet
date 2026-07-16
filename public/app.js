@@ -61,7 +61,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 // sizing and vector stroke widths visually consistent with the exported PDF.
 const RENDER_SCALE = 1.4;
 const TOOL_LABELS = {
-  select: ["Select", "Click any element on the page to select it, or use a tool from the rail."],
+  select: ["Select", "Drag any element to move it; drag its corner handle to resize. Double-click text to edit it."],
   hand: ["Hand", "Drag the page to pan around. Nothing is added to the document."],
   text: ["Text", "Click anywhere on the page, then type directly on it."],
   edittext: ["Edit text", "OCR the page, then edit its existing text in place (Adobe-style)."],
@@ -262,6 +262,7 @@ function drawMarker(box, a) {
   }
   m.appendChild(removeBtn(a));
   box.appendChild(m);
+  if (tk.tool === "select") addSelectionFrame(box, a, m);
 }
 
 // Text is edited directly on the page: the marker itself is contenteditable, so you type
@@ -277,7 +278,9 @@ function styleTextEl(m, a) {
   m.style.textAlign = a.align || "left";
 }
 function drawTextMarker(box, a) {
-  const editable = tk.tool === "text" || tk.tool === "select";
+  // Text tool → type inline. Select tool → drag to move, double-click to edit in place.
+  const typing = tk.tool === "text" || (tk.tool === "select" && a._editing);
+  const movable = tk.tool === "select" && !a._editing;
   const m = document.createElement("div");
   m.className = "textmarker";
   m.style.cssText = "position:absolute;white-space:pre-wrap;outline:none;padding:0 1px;line-height:1.25";
@@ -286,7 +289,7 @@ function drawTextMarker(box, a) {
   m.textContent = a.text;
   styleTextEl(m, a);
   a._el = m;
-  if (editable) {
+  if (typing) {
     m.contentEditable = "true"; m.spellcheck = false;
     m.style.border = "1px dashed " + (a === tk.activeText ? "var(--accent)" : "rgba(120,120,130,.45)");
     m.style.background = "rgba(255,255,255,.5)";
@@ -295,14 +298,19 @@ function drawTextMarker(box, a) {
     m.addEventListener("focus", () => { if (tk.activeText !== a) { tk.activeText = a; highlightActiveText(); renderPropsPanel(); } });
     m.addEventListener("input", () => (a.text = m.innerText));
     m.addEventListener("blur", () => {
-      a.text = m.innerText;
+      a.text = m.innerText; a._editing = false;
       if (!a.text.trim()) { tk.annos = tk.annos.filter((x) => x !== a); if (tk.activeText === a) tk.activeText = null; renderCurrentPage(); renderPropsPanel(); }
     });
+  } else if (movable) {
+    m.style.cursor = "move";
+    m.style.border = "1px dashed rgba(120,120,130,.45)";
+    m.addEventListener("pointerdown", (e) => startTextMove(box, a, m, e));
+    m.addEventListener("dblclick", async () => { a._editing = true; await renderCurrentPage(); if (a._el) { a._el.focus(); placeCaretEnd(a._el); } });
   } else {
     m.style.pointerEvents = "none";
   }
   box.appendChild(m);
-  if (editable) {
+  if (typing || movable) {
     const rm = removeBtn(a);
     rm.style.position = "absolute"; rm.style.left = a.x * 100 + "%"; rm.style.top = a.y * 100 + "%"; rm.style.transform = "translate(-50%,-50%)";
     box.appendChild(rm);
@@ -312,6 +320,66 @@ function highlightActiveText() {
   document.querySelectorAll("#pageShell .textmarker").forEach((el) => {
     el.style.borderColor = el === tk.activeText?._el ? "var(--accent)" : "rgba(120,120,130,.45)";
   });
+}
+
+// ---- move / resize under the Select tool ----
+// A selection frame (a positioned div at the annotation's bounding box) provides drag-to-move
+// and, for box-shaped annotations, a corner resize handle. During a drag the frame + visual are
+// translated with a CSS transform for smoothness, then the fractional delta is committed to the
+// annotation model and the page re-rendered.
+function annoBBox(a) {
+  if (a.kind === "ink") { const xs = a.points.map((p) => p.x), ys = a.points.map((p) => p.y); const x = Math.min(...xs), y = Math.min(...ys); return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }; }
+  if (a.kind === "shape") { const x = Math.min(a.x0, a.x1), y = Math.min(a.y0, a.y1); return { x, y, w: Math.abs(a.x1 - a.x0), h: Math.abs(a.y1 - a.y0) }; }
+  return { x: a.x, y: a.y, w: a.w || 0, h: a.h || 0 };
+}
+function isResizable(a) { return ["signature", "initials", "image", "highlight", "redact"].includes(a.kind) || (a.kind === "shape" && (a.type === "rect" || a.type === "ellipse")); }
+function moveAnnoBy(a, dx, dy) {
+  if (a.kind === "ink") a.points = a.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+  else if (a.kind === "shape") { a.x0 += dx; a.x1 += dx; a.y0 += dy; a.y1 += dy; }
+  else { a.x += dx; a.y += dy; }
+}
+function resizeAnnoTo(a, nw, nh) {
+  nw = Math.max(0.01, nw); nh = Math.max(0.01, nh);
+  if (a.kind === "shape") { const x0 = Math.min(a.x0, a.x1), y0 = Math.min(a.y0, a.y1); a.x0 = x0; a.y0 = y0; a.x1 = x0 + nw; a.y1 = y0 + nh; }
+  else { a.w = nw; a.h = nh; }
+}
+function addSelectionFrame(box, a, visualEl) {
+  const bb = annoBBox(a);
+  const f = document.createElement("div");
+  f.className = "selframe";
+  f.style.left = bb.x * 100 + "%"; f.style.top = bb.y * 100 + "%"; f.style.width = bb.w * 100 + "%"; f.style.height = bb.h * 100 + "%";
+  f.addEventListener("pointerdown", (e) => { if (e.target === f) startAnnoMove(box, a, f, visualEl, e); });
+  if (isResizable(a)) {
+    const h = document.createElement("div"); h.className = "rz";
+    h.addEventListener("pointerdown", (e) => startAnnoResize(box, a, f, e));
+    f.appendChild(h);
+  }
+  box.appendChild(f);
+}
+function startAnnoMove(box, a, frame, visualEl, e) {
+  e.preventDefault(); e.stopPropagation();
+  const rect = box.getBoundingClientRect(); const sx = e.clientX, sy = e.clientY; let moved = false;
+  const move = (ev) => { moved = true; const t = `translate(${ev.clientX - sx}px,${ev.clientY - sy}px)`; frame.style.transform = t; if (visualEl) visualEl.style.transform = t; };
+  const up = (ev) => {
+    window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
+    if (moved) { moveAnnoBy(a, (ev.clientX - sx) / rect.width, (ev.clientY - sy) / rect.height); renderCurrentPage(); }
+  };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+}
+function startAnnoResize(box, a, frame, e) {
+  e.preventDefault(); e.stopPropagation();
+  const rect = box.getBoundingClientRect(); const bb = annoBBox(a); const sx = e.clientX, sy = e.clientY;
+  const calc = (ev) => ({ nw: Math.max(0.01, bb.w + (ev.clientX - sx) / rect.width), nh: Math.max(0.01, bb.h + (ev.clientY - sy) / rect.height) });
+  const move = (ev) => { const { nw, nh } = calc(ev); frame.style.width = nw * 100 + "%"; frame.style.height = nh * 100 + "%"; };
+  const up = (ev) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); const { nw, nh } = calc(ev); resizeAnnoTo(a, nw, nh); renderCurrentPage(); };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+}
+function startTextMove(box, a, el, e) {
+  e.preventDefault(); e.stopPropagation();
+  const rect = box.getBoundingClientRect(); const sx = e.clientX, sy = e.clientY; let moved = false;
+  const move = (ev) => { moved = true; el.style.transform = `translate(${ev.clientX - sx}px,${ev.clientY - sy}px)`; };
+  const up = (ev) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); if (moved) { a.x += (ev.clientX - sx) / rect.width; a.y += (ev.clientY - sy) / rect.height; renderCurrentPage(); } };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
 }
 function placeCaretEnd(el) {
   const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
@@ -461,6 +529,7 @@ function drawVectorMarker(box, a) {
   const rm = removeBtn(a);
   rm.style.position = "absolute"; rm.style.left = bbox.x * 100 + "%"; rm.style.top = bbox.y * 100 + "%"; rm.style.transform = "translate(-50%,-50%)";
   box.appendChild(rm);
+  if (tk.tool === "select") addSelectionFrame(box, a, svg);
 }
 function shapeSvgEls(a) {
   const x = Math.min(a.x0, a.x1) * 100, y = Math.min(a.y0, a.y1) * 100;
@@ -601,7 +670,11 @@ function startShape(box, e) {
     window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
     svg.remove();
     if (dragState && dragState.dragged && (Math.abs(dragState.x1 - x0) > 0.005 || Math.abs(dragState.y1 - y0) > 0.005)) {
-      tk.annos.push({ kind: "shape", type: tk.shape.type, page: tk.currentPage, x0, y0, x1: dragState.x1, y1: dragState.y1, color: tk.shape.color, fill: tk.shape.fill, width: tk.shape.width });
+      let [X0, Y0, X1, Y1] = [x0, y0, dragState.x1, dragState.y1];
+      // Normalize rect/ellipse to top-left → bottom-right so the resize handle behaves; keep
+      // line/arrow endpoints as drawn (direction matters).
+      if (tk.shape.type === "rect" || tk.shape.type === "ellipse") { [X0, X1] = [Math.min(X0, X1), Math.max(X0, X1)]; [Y0, Y1] = [Math.min(Y0, Y1), Math.max(Y0, Y1)]; }
+      tk.annos.push({ kind: "shape", type: tk.shape.type, page: tk.currentPage, x0: X0, y0: Y0, x1: X1, y1: Y1, color: tk.shape.color, fill: tk.shape.fill, width: tk.shape.width });
       renderCurrentPage();
     }
     setTimeout(() => (dragState = null), 0);
@@ -644,7 +717,7 @@ function renderPropsPanel() {
   const builders = { select: buildSelectPanel, hand: buildHandPanel, text: buildTextPanel, edittext: buildEditTextPanel, signature: buildSigPanel, draw: buildDrawPanel, shape: buildShapePanel, highlight: buildHighlightPanel, image: buildImagePanel, redact: buildRedactPanel, watermark: buildWatermarkPanel, pagenum: buildPagenumPanel, organize: buildOrganizePanel };
   (builders[tk.tool] || buildSelectPanel)(body);
 }
-function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Nothing selected.<br>Click any element on the page to remove it (×), or pick a tool from the rail on the left.</div>'; }
+function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Drag any placed element to move it.<br>Drag the corner handle to resize. Double-click text to edit it. Use × to delete.</div>'; }
 function buildHandPanel(body) { body.innerHTML = '<p class="hint">Drag anywhere on the page to pan around. Handy when zoomed in. This tool never changes the document.</p>'; }
 
 function buildEditTextPanel(body) {
