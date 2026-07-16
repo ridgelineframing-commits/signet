@@ -1225,6 +1225,7 @@ function openEnvelopeWizard(presetFile, presetTitle) {
   ev.recipients = [{ name: "", email: "", order: 1, role: "signer" }];
   $("envTitle").value = presetTitle || (presetFile ? presetFile.name.replace(/\.pdf$/i, "") : "");
   $("envMessage").value = "";
+  $("envRequireOtp").checked = false;
   $("envModalDoc").textContent = presetFile ? presetFile.name : "Choose a PDF below";
   renderRecipientsList();
   $("envStep1").hidden = false; $("envStep2").hidden = true;
@@ -1325,6 +1326,7 @@ $("envSend").onclick = async () => {
   form.append("recipients", JSON.stringify(ev.recipients));
   form.append("fields", JSON.stringify(ev.fields));
   form.append("sendNow", "true");
+  form.append("requireOtp", $("envRequireOtp").checked ? "true" : "false");
   try { await api("/api/admin/envelopes", { method: "POST", body: form }); envModal.hidden = true; refreshEnvelopes(); toast("Sent for signature.", "success"); }
   catch (e) { toast("Couldn't send: " + e.message, "error"); }
 };

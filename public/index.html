@@ -243,6 +243,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
       <p class="hint">Recipients with the same "order" number sign in parallel; lower numbers sign first.</p>
       <div class="label" style="margin-top:14px">Message</div>
       <textarea id="envMessage" placeholder="Add a note to include in the invitation email…" style="width:100%;min-height:70px"></textarea>
+      <label class="row" style="gap:9px;margin-top:14px;cursor:pointer"><input type="checkbox" id="envRequireOtp" style="width:16px;height:16px;accent-color:var(--accent)" /> <span class="hint" style="margin:0">Require each signer to verify a one-time code emailed to them before signing (needs email configured).</span></label>
     </div>
     <div id="envStep2" class="modal-body" hidden>
       <p class="hint">Pick a recipient, pick a field type, then click a spot on the page to drop it there.</p>

@@ -9,6 +9,7 @@
   /* Palette mirrors the main editor (public/index.html) so the signer sees one brand. */
   :root { --accent:#4f46e5; --ink:#191b1f; --ink2:#24262c; --sub:#5b6068; --sub2:#7c8089; --line:#e7e8ec; --line2:#e2e3e8; --bg:#ecebef; --good:#17936a; --bad:#dc2b3b; }
   * { box-sizing:border-box; }
+  [hidden] { display:none !important; }  /* modal-back sets display:flex, which otherwise overrides the hidden attribute */
   body { margin:0; font-family:'Hanken Grotesk',system-ui,sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
   header { background:#fff; color:var(--ink); border-bottom:1px solid var(--line); padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
   header .brand { font-weight:700; font-size:19px; letter-spacing:-.01em; }
@@ -52,6 +53,20 @@
 <body>
 
 <div id="centerState" hidden><div class="box"><h2 id="csTitle"></h2><p id="csMsg"></p></div></div>
+
+<div id="otpGate" hidden style="min-height:80vh;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div class="box" style="max-width:420px;background:#fff;padding:36px 32px;border-radius:16px;box-shadow:0 6px 26px rgba(20,22,30,.1);text-align:center">
+    <h2 style="margin:0 0 6px">Verify it's you</h2>
+    <p style="color:var(--sub);margin:0 0 18px;line-height:1.5">To sign <strong id="otpDoc"></strong>, enter the one-time code we'll email to <strong id="otpEmail"></strong>.</p>
+    <button class="btn" id="otpSend" style="width:100%">Email me a code</button>
+    <div id="otpEntry" hidden style="margin-top:14px">
+      <input type="text" id="otpInput" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="width:100%;text-align:center;font-size:22px;letter-spacing:8px;border:1px solid var(--line);border-radius:8px;padding:12px" />
+      <button class="btn" id="otpVerify" style="width:100%;margin-top:10px">Verify &amp; continue</button>
+      <p class="hint" id="otpResend" style="margin-top:10px;color:var(--sub)"></p>
+    </div>
+    <p class="err" id="otpErr" style="color:var(--bad);font-size:13px;min-height:18px;margin-top:10px"></p>
+  </div>
+</div>
 
 <div id="signApp" hidden>
   <header>
@@ -133,16 +148,66 @@ async function load() {
     return showCenter("No longer available", "This document is no longer available for signing.");
   }
 
+  // Gate signing behind an emailed one-time code when the sender required it.
+  if (envelope.requireOtp && !recipient.otpVerified) {
+    return showOtpGate();
+  }
+  revealSigning();
+}
+
+function revealSigning() {
+  const { envelope, recipient } = state.data;
+  document.getElementById("otpGate").hidden = true;
   document.getElementById("docTitle").textContent = envelope.title;
   document.getElementById("progressLabel").textContent = `Signing as ${recipient.name}`;
   document.getElementById("banner").textContent = envelope.message
     ? envelope.message
     : `Please review ${envelope.title} and complete the highlighted fields below.`;
   document.getElementById("signApp").hidden = false;
-
-  await renderPdf();
-  updateFieldsLeft();
+  renderPdf().then(updateFieldsLeft);
 }
+
+// ---- OTP verification gate ----
+function showOtpGate() {
+  const { envelope, recipient } = state.data;
+  document.getElementById("otpDoc").textContent = envelope.title;
+  document.getElementById("otpEmail").textContent = recipient.email; // already masked by the server
+  document.getElementById("otpGate").hidden = false;
+}
+document.getElementById("otpSend").onclick = async () => {
+  const btn = document.getElementById("otpSend");
+  document.getElementById("otpErr").textContent = "";
+  btn.disabled = true; btn.textContent = "Sending…";
+  try {
+    const res = await fetch(`/api/sign/${token}/otp`, { method: "POST" });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || "Couldn't send the code.");
+    document.getElementById("otpEntry").hidden = false;
+    document.getElementById("otpResend").textContent = `Code sent to ${j.to || "your email"}. Didn't get it? Click "Email me a code" again.`;
+    btn.textContent = "Resend code";
+    document.getElementById("otpInput").focus();
+  } catch (e) {
+    document.getElementById("otpErr").textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+document.getElementById("otpVerify").onclick = async () => {
+  const code = document.getElementById("otpInput").value.trim();
+  const btn = document.getElementById("otpVerify");
+  document.getElementById("otpErr").textContent = "";
+  btn.disabled = true; btn.textContent = "Verifying…";
+  try {
+    const res = await fetch(`/api/sign/${token}/verify-otp`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || "Incorrect code.");
+    state.data.recipient.otpVerified = true;
+    revealSigning();
+  } catch (e) {
+    document.getElementById("otpErr").textContent = e.message;
+    btn.disabled = false; btn.textContent = "Verify & continue";
+  }
+};
 load();
 
 async function renderPdf() {

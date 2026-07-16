@@ -8,6 +8,7 @@
     "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 execute signet-db --file=./schema.sql --remote",
     "db:migrate:local": "wrangler d1 execute signet-db --file=./schema.sql --local",
+    "db:migrate:otp": "wrangler d1 execute signet-db --file=./migrations/001_add_otp.sql --remote",
     "tail": "wrangler tail"
   },
   "dependencies": {
