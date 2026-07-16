@@ -4,6 +4,18 @@ const { PDFDocument, degrees, rgb, StandardFonts } = window.PDFLib;
 const $ = (id) => document.getElementById(id);
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
+// Non-blocking toast notifications (replaces toast()). type: "info" | "success" | "error".
+function toast(msg, type = "info") {
+  let wrap = $("toasts");
+  if (!wrap) { wrap = document.createElement("div"); wrap.id = "toasts"; document.body.appendChild(wrap); }
+  const t = document.createElement("div");
+  t.className = "toast " + type;
+  t.textContent = msg;
+  wrap.appendChild(t);
+  requestAnimationFrame(() => t.classList.add("show"));
+  setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, type === "error" ? 5000 : 3200);
+}
+
 // ------------------------------------------------------------------ auth
 const tokenKey = "signet_token";
 const getToken = () => localStorage.getItem(tokenKey);
@@ -326,7 +338,7 @@ function drawEditTextMarker(box, a) {
     m.contentEditable = "true"; m.spellcheck = false;
     m.addEventListener("pointerdown", (e) => e.stopPropagation());
     m.addEventListener("click", (e) => e.stopPropagation());
-    m.addEventListener("input", () => { a.text = m.innerText; if (a.text !== a.origText && !a.dirty) { a.dirty = true; m.style.background = "#fff"; m.style.color = "#0d0d14"; } });
+    m.addEventListener("input", () => { a.text = m.innerText; if (a.text !== a.origText && !a.dirty) { a.dirty = true; m.style.background = "#fff"; m.style.color = "#0d0d14"; renderPropsPanel(); } });
   } else {
     m.style.pointerEvents = "none";
   }
@@ -353,40 +365,67 @@ async function getOcrWorker(onProgress) {
   });
   return ocrWorker;
 }
-async function ocrCurrentPage(statusEl) {
+// Render page `pageIdx` at OCR resolution, recognize it, and replace that page's edittext
+// annotations. Returns the number of lines found.
+async function ocrRecognizePage(pageIdx, worker) {
+  const doc = await getRenderDoc();
+  const page = await doc.getPage(tk.order[pageIdx] + 1);
+  const vp = page.getViewport({ scale: 2.5 }); // higher res than the editor canvas for accuracy
+  const canvas = document.createElement("canvas");
+  canvas.width = vp.width; canvas.height = vp.height;
+  await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+  const { data } = await worker.recognize(canvas);
+  tk.annos = tk.annos.filter((a) => !(a.kind === "edittext" && a.page === pageIdx)); // re-scan replaces
+  let n = 0;
+  for (const line of data.lines || []) {
+    const t = (line.text || "").replace(/\n/g, " ").trim();
+    if (!t) continue;
+    const bb = line.bbox;
+    const x = bb.x0 / canvas.width, y = bb.y0 / canvas.height, w = (bb.x1 - bb.x0) / canvas.width, h = (bb.y1 - bb.y0) / canvas.height;
+    if (w <= 0 || h <= 0) continue;
+    tk.annos.push({ kind: "edittext", page: pageIdx, x, y, w, h, text: t, origText: t, dirty: false });
+    n++;
+  }
+  return n;
+}
+// Shared setup/teardown for any OCR run: guards against concurrent runs, boots the worker,
+// surfaces progress, and refreshes the panel afterward.
+async function withOcr(statusEl, fn) {
   if (!hasDoc() || ocrBusy) return;
   ocrBusy = true;
-  const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+  let lastMsg = "";
+  const setStatus = (t) => { lastMsg = t; const el = $("ocrStatus") || statusEl; if (el) el.textContent = t; };
+  [$("ocrBtn"), $("ocrAllBtn")].forEach((b) => b && (b.disabled = true));
   try {
     setStatus("Loading OCR engine… (first run only)");
     const worker = await getOcrWorker((m) => { if (m.status) setStatus(m.status[0].toUpperCase() + m.status.slice(1) + (m.progress ? ` — ${Math.round(m.progress * 100)}%` : "…")); });
-    setStatus("Rendering page…");
-    const doc = await getRenderDoc();
-    const page = await doc.getPage(tk.order[tk.currentPage] + 1);
-    const vp = page.getViewport({ scale: 2.5 }); // higher res than the editor canvas for accuracy
-    const canvas = document.createElement("canvas");
-    canvas.width = vp.width; canvas.height = vp.height;
-    await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
-    setStatus("Recognizing text…");
-    const { data } = await worker.recognize(canvas);
-    tk.annos = tk.annos.filter((a) => !(a.kind === "edittext" && a.page === tk.currentPage)); // re-scan replaces
-    let n = 0;
-    for (const line of data.lines || []) {
-      const t = (line.text || "").replace(/\n/g, " ").trim();
-      if (!t) continue;
-      const bb = line.bbox;
-      const x = bb.x0 / canvas.width, y = bb.y0 / canvas.height, w = (bb.x1 - bb.x0) / canvas.width, h = (bb.y1 - bb.y0) / canvas.height;
-      if (w <= 0 || h <= 0) continue;
-      tk.annos.push({ kind: "edittext", page: tk.currentPage, x, y, w, h, text: t, origText: t, dirty: false });
-      n++;
-    }
-    await renderCurrentPage();
-    setStatus(n ? `${n} line${n === 1 ? "" : "s"} recognized — click any line to edit it in place.` : "No text detected on this page.");
+    await fn(worker, setStatus);
   } catch (e) {
     console.error(e); setStatus("OCR failed: " + (e?.message || e));
   } finally {
     ocrBusy = false;
+    renderPropsPanel(); // re-enable buttons + refresh counts
+    const el = $("ocrStatus"); if (el && lastMsg) el.textContent = lastMsg;
   }
+}
+async function ocrCurrentPage(statusEl) {
+  await withOcr(statusEl, async (worker, setStatus) => {
+    setStatus("Recognizing text…");
+    const n = await ocrRecognizePage(tk.currentPage, worker);
+    await renderCurrentPage();
+    setStatus(n ? `${n} line${n === 1 ? "" : "s"} recognized — click any line to edit it in place.` : "No text detected on this page.");
+  });
+}
+async function ocrAllPages(statusEl) {
+  await withOcr(statusEl, async (worker, setStatus) => {
+    let total = 0;
+    for (let i = 0; i < tk.order.length; i++) {
+      setStatus(`Scanning page ${i + 1} of ${tk.order.length}…`);
+      total += await ocrRecognizePage(i, worker);
+    }
+    await renderCurrentPage();
+    setStatus(`${total} line${total === 1 ? "" : "s"} recognized across ${tk.order.length} page${tk.order.length === 1 ? "" : "s"} — edit any line in place.`);
+  });
 }
 function removeBtn(a) {
   const rm = document.createElement("button");
@@ -611,12 +650,18 @@ function buildHandPanel(body) { body.innerHTML = '<p class="hint">Drag anywhere 
 function buildEditTextPanel(body) {
   const count = tk.annos.filter((a) => a.kind === "edittext" && a.page === tk.currentPage).length;
   const edited = tk.annos.filter((a) => a.kind === "edittext" && a.page === tk.currentPage && a.dirty).length;
+  const multi = tk.order.length > 1;
   body.innerHTML = `
-    <p class="hint" style="margin-bottom:12px">Make an existing PDF's text editable. Signet reads the current page with OCR, then lets you edit each line right on the page. Edited lines get patched into the exported PDF; untouched text is left exactly as it was.</p>
+    <p class="hint" style="margin-bottom:12px">Make an existing PDF's text editable. Signet reads the page with OCR, then lets you edit each line right on the page. Edited lines get patched into the exported PDF; untouched text is left exactly as it was.</p>
     <button class="btn primary" id="ocrBtn" style="width:100%;justify-content:center" ${ocrBusy ? "disabled" : ""}>${count ? "Re-scan this page" : "Scan this page for text"}</button>
+    ${multi ? `<button class="btn" id="ocrAllBtn" style="width:100%;justify-content:center;margin-top:8px" ${ocrBusy ? "disabled" : ""}>Scan all ${tk.order.length} pages</button>` : ""}
     <p class="hint" id="ocrStatus" style="margin-top:12px">${count ? `${count} line(s) recognized${edited ? `, ${edited} edited` : ""}.` : ""}</p>
+    ${edited ? `<button class="btn danger" id="ocrFlattenBtn" style="width:100%;justify-content:center;margin-top:8px">Apply &amp; flatten page (${edited} edit${edited === 1 ? "" : "s"})</button>
+    <p class="hint" style="margin-top:8px">Flattening bakes your edits and rasterizes this page, so the original text is <strong>truly removed</strong>, not just covered. Otherwise the original stays in the file's text layer under the patch.</p>` : ""}
     <p class="hint" style="margin-top:14px;color:var(--sub3)">Patched text is set in Helvetica, so it reads best on plain / white backgrounds. First scan downloads the OCR model once (it's bundled, no network).</p>`;
   $("ocrBtn").onclick = () => ocrCurrentPage($("ocrStatus"));
+  if ($("ocrAllBtn")) $("ocrAllBtn").onclick = () => ocrAllPages($("ocrStatus"));
+  if ($("ocrFlattenBtn")) $("ocrFlattenBtn").onclick = flattenEditedPage;
 }
 
 function buildDrawPanel(body) {
@@ -766,11 +811,11 @@ function buildSigPanel(body) {
     return sigUploadDataUrl;
   }
   $("placeSigBtn").onclick = async () => {
-    const dataUrl = await buildDataUrl(); if (!dataUrl) return alert("Draw, type, or upload a signature first.");
+    const dataUrl = await buildDataUrl(); if (!dataUrl) return toast("Draw, type, or upload a signature first.", "error");
     tk.pendingSig = { dataUrl, kind: "signature" }; tk.placeArmed = true; renderPropsPanel();
   };
   $("placeInitBtn").onclick = async () => {
-    const dataUrl = await buildDataUrl(); if (!dataUrl) return alert("Draw, type, or upload a signature first.");
+    const dataUrl = await buildDataUrl(); if (!dataUrl) return toast("Draw, type, or upload a signature first.", "error");
     tk.pendingSig = { dataUrl, kind: "initials" }; tk.placeArmed = true; renderPropsPanel();
   };
 }
@@ -814,7 +859,7 @@ function buildWatermarkPanel(body) {
     tk._wm.text = $("wmText").value || "DRAFT"; tk._wm.opacity = Number($("wmOpacity").value); tk._wm.angle = Number($("wmAngle").value);
     tk.annos = tk.annos.filter((a) => a.kind !== "watermark");
     for (let i = 0; i < tk.order.length; i++) tk.annos.push({ kind: "watermark", page: i, text: tk._wm.text, opacity: tk._wm.opacity / 100, angle: tk._wm.angle });
-    renderCurrentPage(); alert("Watermark applied to all " + tk.order.length + " pages. It'll appear in the exported/sent PDF.");
+    renderCurrentPage(); toast("Watermark applied to all " + tk.order.length + " pages. It'll appear in the exported/sent PDF.", "success");
   };
 }
 function buildPagenumPanel(body) {
@@ -832,7 +877,7 @@ function buildPagenumPanel(body) {
     tk._pn.start = Number($("pnStart").value) || 1; tk._pn.pos = $("pnPos").value;
     tk.annos = tk.annos.filter((a) => a.kind !== "pagenum");
     for (let i = 0; i < tk.order.length; i++) tk.annos.push({ kind: "pagenum", page: i, number: tk._pn.start + i, pos: tk._pn.pos });
-    renderCurrentPage(); alert("Page numbers applied. They'll appear in the exported/sent PDF.");
+    renderCurrentPage(); toast("Page numbers applied. They'll appear in the exported/sent PDF.", "success");
   };
 }
 function buildOrganizePanel(body) {
@@ -869,7 +914,7 @@ async function duplicateCurrent() {
   fullRerender();
 }
 function deleteCurrent() {
-  if (tk.order.length <= 1) return alert("Can't delete the only page.");
+  if (tk.order.length <= 1) return toast("Can't delete the only page.", "error");
   tk.order.splice(tk.currentPage, 1);
   tk.annos = tk.annos.filter((a) => a.page !== tk.currentPage).map((a) => (a.page > tk.currentPage ? { ...a, page: a.page - 1 } : a));
   fullRerender();
@@ -893,12 +938,17 @@ async function bakeAndExport() {
   const ordered = await PDFDocument.create();
   const copied = await ordered.copyPages(tk.pdfDoc, tk.order);
   copied.forEach((p) => ordered.addPage(p));
+  await drawAnnos(ordered, tk.annos);
+  return ordered.save();
+}
+// Draw a set of annotations onto a pdf-lib document (pages indexed by anno.page).
+async function drawAnnos(ordered, annos) {
   const font = await ordered.embedFont(StandardFonts.Helvetica);
   const fontBold = await ordered.embedFont(StandardFonts.HelveticaBold);
   const fontItalic = await ordered.embedFont(StandardFonts.HelveticaOblique);
   const fontBoldItalic = await ordered.embedFont(StandardFonts.HelveticaBoldOblique);
   const pages = ordered.getPages();
-  for (const a of tk.annos) {
+  for (const a of annos) {
     const page = pages[a.page]; if (!page) continue;
     const { width, height } = page.getSize();
     if (a.kind === "watermark") {
@@ -970,9 +1020,29 @@ async function bakeAndExport() {
       }
     }
   }
-  return ordered.save();
 }
 function hexToRgb01(hex) { const h = (hex || "#000000").replace("#", ""); const f = h.length === 3 ? h.split("").map((c) => c + c).join("") : h; const n = parseInt(f, 16); return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 }; }
+
+// True text removal for the Edit-text tool: bake the current page's annotations, rasterize
+// just that page (so the original vector text is gone, not merely covered), and swap it back
+// into the working document. Other pages keep their vector text.
+async function flattenEditedPage() {
+  if (ocrBusy) return;
+  const pageIdx = tk.currentPage;
+  const single = await PDFDocument.create();
+  const [copied] = await single.copyPages(tk.pdfDoc, [tk.order[pageIdx]]);
+  single.addPage(copied);
+  await drawAnnos(single, tk.annos.filter((a) => a.page === pageIdx).map((a) => ({ ...a, page: 0 })));
+  const raster = await rasterizePdf(await single.save());
+  const rasterDoc = await PDFDocument.load(raster);
+  const [rasterPage] = await tk.pdfDoc.copyPages(rasterDoc, [0]);
+  tk.order[pageIdx] = tk.pdfDoc.getPageCount();
+  tk.pdfDoc.addPage(rasterPage);
+  tk.annos = tk.annos.filter((a) => a.page !== pageIdx); // now baked into the raster
+  invalidateRender();
+  await fullRerender();
+  toast("Page flattened — your edits are permanent and the original text is removed.", "success");
+}
 
 async function rasterizePdf(bytes) {
   const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
@@ -994,7 +1064,7 @@ function dataUrlToBytes(dataUrl) { const b64 = dataUrl.split(",")[1]; const bin 
 function downloadBytes(bytes, filename) { const blob = new Blob([bytes], { type: "application/pdf" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
 
 async function flattenNow() {
-  if (!tk.annos.some((a) => a.kind === "redact")) return alert("Mark at least one redaction box first.");
+  if (!tk.annos.some((a) => a.kind === "redact")) return toast("Mark at least one redaction box first.", "error");
   const baked = await bakeAndExport();
   const rasterized = await rasterizePdf(baked);
   tk.pdfDoc = await PDFDocument.load(rasterized);
@@ -1002,7 +1072,7 @@ async function flattenNow() {
   tk.annos = [];
   invalidateRender();
   await fullRerender();
-  alert("Redactions applied and flattened — the underlying content is permanently removed.");
+  toast("Redactions applied and flattened — the underlying content is permanently removed.", "success");
 }
 
 $("downloadBtn").onclick = async () => { if (!hasDoc()) return; const bytes = await bakeAndExport(); downloadBytes(bytes, (tk.fileName || "signet-export").replace(/\.pdf$/i, "") + "-export.pdf"); };
@@ -1048,7 +1118,7 @@ async function openEnvelope(id) {
       ${envelope.status === "completed" ? `<a class="btn primary" href="/api/admin/envelopes/${envelope.id}/download">Download signed PDF</a>` : ""}
       ${!["voided", "completed", "declined"].includes(envelope.status) ? `<button class="btn danger" id="voidBtn">Void envelope</button>` : ""}
     </div>`;
-  card.querySelectorAll("[data-remind]").forEach((b) => (b.onclick = async () => { await api(`/api/admin/envelopes/${id}/remind/${b.dataset.remind}`, { method: "POST" }); alert("Reminder sent."); }));
+  card.querySelectorAll("[data-remind]").forEach((b) => (b.onclick = async () => { await api(`/api/admin/envelopes/${id}/remind/${b.dataset.remind}`, { method: "POST" }); toast("Reminder sent.", "success"); }));
   const voidBtn = card.querySelector("#voidBtn");
   if (voidBtn) voidBtn.onclick = async () => { if (confirm("Void this envelope? Signers will no longer be able to sign.")) { await api(`/api/admin/envelopes/${id}/void`, { method: "POST" }); openEnvelope(id); refreshEnvelopes(); } };
 }
@@ -1102,9 +1172,9 @@ const FIELD_DEFAULT_SIZE = { signature: [0.28, 0.09], initials: [0.1, 0.06], dat
 $("envNext").onclick = async () => {
   const nextBtn = $("envNext");
   try {
-    const file = ev.presetFile; if (!file) return alert("This envelope needs a document — send one from the PDF Editor first via \"Send for signature\".");
+    const file = ev.presetFile; if (!file) return toast("This envelope needs a document — send one from the PDF Editor first via \"Send for signature\".", "error");
     const recipients = ev.recipients.filter((r) => r.name.trim() && r.email.trim());
-    if (!recipients.length) return alert("Add at least one recipient with a name and email.");
+    if (!recipients.length) return toast("Add at least one recipient with a name and email.", "error");
     ev.recipients = recipients;
     nextBtn.disabled = true; nextBtn.textContent = "Loading…";
     ev.fields = [];
@@ -1134,7 +1204,7 @@ $("envNext").onclick = async () => {
     $("envStep1").hidden = true; $("envStep2").hidden = false;
     $("envBack").hidden = false; $("envNext").hidden = true; $("envSend").hidden = false;
     $("envFootHint").textContent = "Click the document to drop the selected field for the selected recipient.";
-  } catch (err) { console.error(err); alert("Couldn't load that PDF for field placement: " + (err?.message || err)); }
+  } catch (err) { console.error(err); toast("Couldn't load that PDF for field placement: " + (err?.message || err), "error"); }
   finally { nextBtn.disabled = false; nextBtn.textContent = "Continue → place fields"; }
 };
 $("envBack").onclick = () => { $("envStep1").hidden = false; $("envStep2").hidden = true; $("envBack").hidden = true; $("envNext").hidden = false; $("envSend").hidden = true; $("envFootHint").textContent = "Next: drop signature fields onto the document."; };
@@ -1172,7 +1242,7 @@ function placeEnvField(e, box, pageIdx) {
   drawEnvMarkers(box, pageIdx);
 }
 $("envSend").onclick = async () => {
-  if (!ev.fields.length) return alert("Place at least one field before sending.");
+  if (!ev.fields.length) return toast("Place at least one field before sending.", "error");
   const form = new FormData();
   form.append("title", $("envTitle").value || "Untitled document");
   form.append("message", $("envMessage").value || "");
@@ -1182,8 +1252,8 @@ $("envSend").onclick = async () => {
   form.append("recipients", JSON.stringify(ev.recipients));
   form.append("fields", JSON.stringify(ev.fields));
   form.append("sendNow", "true");
-  try { await api("/api/admin/envelopes", { method: "POST", body: form }); envModal.hidden = true; refreshEnvelopes(); }
-  catch (e) { alert("Couldn't send: " + e.message); }
+  try { await api("/api/admin/envelopes", { method: "POST", body: form }); envModal.hidden = true; refreshEnvelopes(); toast("Sent for signature.", "success"); }
+  catch (e) { toast("Couldn't send: " + e.message, "error"); }
 };
 
 if (getToken()) refreshEnvelopes();

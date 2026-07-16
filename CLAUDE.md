@@ -93,8 +93,8 @@ before running it.
   agent that built it (sandbox had no working headless browser) — it *was* verified live via
   Claude-in-Chrome browser automation in one later session and confirmed working end to end
   for login. Worth a thorough manual pass before relying on it for a real signature request.
-- `wrangler` here is v3.114.17 (outdated, v4 available) — fine for now, consider upgrading if
-  you hit compatibility issues.
+- `wrangler` is on v4 (upgraded from v3); `deploy --dry-run` bundles cleanly against the
+  current config.
 
 ## Who's touching what
 

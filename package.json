@@ -20,6 +20,6 @@
     "pdfjs-dist": "^6.1.200",
     "tesseract.js": "^5.1.1",
     "tesseract.js-core": "^5.1.1",
-    "wrangler": "^3.90.0"
+    "wrangler": "^4.111.0"
   }
 }
