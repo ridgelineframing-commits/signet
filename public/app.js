@@ -94,6 +94,7 @@ async function loadFiles(files, replacing) {
   $("downloadBtn").disabled = false;
   $("requestSigBtn").disabled = false;
   $("addPagesBtn").hidden = false;
+  $("pagesToggle").hidden = false;
   $("docTitleLbl").textContent = tk.fileName || "Untitled document";
   $("pageCountChip").hidden = false;
   invalidateRender();
@@ -163,7 +164,7 @@ async function renderThumbs() {
     const card = document.createElement("div"); card.className = "card"; card.appendChild(canvas);
     const lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = "Page " + (i + 1);
     btn.appendChild(card); btn.appendChild(lbl);
-    btn.onclick = () => { tk.currentPage = i; fullRerenderLight(); };
+    btn.onclick = () => { tk.currentPage = i; fullRerenderLight(); if (isMobile()) closeThumbs(); };
     btn.ondragstart = (ev) => ev.dataTransfer.setData("text/plain", String(i));
     btn.ondragover = (ev) => ev.preventDefault();
     btn.ondrop = (ev) => {
@@ -240,8 +241,21 @@ document.querySelectorAll("#toolRail [data-tool]").forEach((b) => {
     document.querySelectorAll("#toolRail [data-tool]").forEach((x) => x.classList.toggle("active", x === b));
     if (hasDoc()) renderCurrentPage(); // text boxes are editable only under Text/Select
     renderPropsPanel();
+    if (isMobile()) openPropsSheet(); // reveal the properties bottom-sheet on mobile
   };
 });
+
+// ------------------------------------------------------------------ mobile layout
+const isMobile = () => window.matchMedia("(max-width:820px)").matches;
+function openThumbs() { document.body.classList.add("show-thumbs"); $("thumbScrim").hidden = false; }
+function closeThumbs() { document.body.classList.remove("show-thumbs"); $("thumbScrim").hidden = true; }
+function openPropsSheet() { if (hasDoc()) document.body.classList.add("show-props"); }
+function closePropsSheet() { document.body.classList.remove("show-props"); }
+$("pagesToggle").onclick = () => (document.body.classList.contains("show-thumbs") ? closeThumbs() : openThumbs());
+$("thumbScrim").onclick = closeThumbs;
+$("propsClose").onclick = closePropsSheet;
+// Leaving mobile width resets any mobile drawers/sheets so the desktop layout is clean.
+window.matchMedia("(max-width:820px)").addEventListener("change", (e) => { if (!e.matches) { closeThumbs(); closePropsSheet(); } });
 
 // ------------------------------------------------------------------ marker drawing + canvas interaction
 function drawMarker(box, a) {
@@ -1238,7 +1252,6 @@ $("requestSigBtn").onclick = async () => {
   if (!hasDoc()) return;
   const bytes = await bakeAndExport();
   const file = new File([bytes], (tk.fileName || "edited-document.pdf"), { type: "application/pdf" });
-  envelopesPanel.hidden = false;
   openEnvelopeWizard(file);
 };
 
@@ -1327,7 +1340,7 @@ $("envSend").onclick = async () => {
   form.append("fields", JSON.stringify(ev.fields));
   form.append("sendNow", "true");
   form.append("requireOtp", $("envRequireOtp").checked ? "true" : "false");
-  try { await api("/api/admin/envelopes", { method: "POST", body: form }); envModal.hidden = true; refreshEnvelopes(); toast("Sent for signature.", "success"); }
+  try { await api("/api/admin/envelopes", { method: "POST", body: form }); envModal.hidden = true; envelopesPanel.hidden = false; refreshEnvelopes(); toast("Sent for signature.", "success"); }
   catch (e) { toast("Couldn't send: " + e.message, "error"); }
 };
 
