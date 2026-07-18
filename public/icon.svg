@@ -1,6 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Signet">
-  <rect width="512" height="512" rx="116" fill="#4f46e5"/>
-  <path d="M96 300 C150 300 150 196 210 196 C262 196 250 330 312 330 C366 330 360 214 416 214"
-        fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="104" y1="380" x2="408" y2="380" stroke="#ffffff" stroke-width="30" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6A4CF0"/>
+      <stop offset="1" stop-color="#4F86FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#sg)"/>
+  <g transform="translate(95,80) scale(3.45)">
+    <path d="M26 14 h30 l14 14 v58 a4 4 0 0 1 -4 4 H26 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" fill="#ffffff"/>
+    <path d="M56 14 v14 h14" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M46 60 v-16 M39 44 h14 M39 60 h14" fill="none" stroke="#6A4CF0" stroke-width="4.5" stroke-linecap="round"/>
+  </g>
 </svg>

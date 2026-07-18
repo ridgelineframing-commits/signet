@@ -6,11 +6,11 @@
 <title>Sign document — Signet</title>
 <link rel="icon" type="image/svg+xml" href="/icon.svg" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-<meta name="theme-color" content="#4f46e5" />
+<meta name="theme-color" content="#6A4CF0" />
 <link href="./vendor/fonts.css" rel="stylesheet">
 <style>
   /* Palette mirrors the main editor (public/index.html) so the signer sees one brand. */
-  :root { --accent:#4f46e5; --ink:#191b1f; --ink2:#24262c; --sub:#5b6068; --sub2:#7c8089; --line:#e7e8ec; --line2:#e2e3e8; --bg:#ecebef; --good:#17936a; --bad:#dc2b3b; }
+  :root { --accent:#6A4CF0; --grad:linear-gradient(135deg,#6A4CF0,#4F86FF); --ink:#191b1f; --ink2:#24262c; --sub:#5b6068; --sub2:#7c8089; --line:#e7e8ec; --line2:#e2e3e8; --bg:#ecebef; --good:#17936a; --bad:#dc2b3b; }
   * { box-sizing:border-box; }
   [hidden] { display:none !important; }  /* modal-back sets display:flex, which otherwise overrides the hidden attribute */
   body { margin:0; font-family:'Hanken Grotesk',system-ui,sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
@@ -22,7 +22,7 @@
   .banner { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; font-size:13.5px; color:var(--sub); line-height:1.5; }
   .page-wrap { position:relative; margin:0 auto 18px; border:1px solid var(--line); background:#fff; box-shadow:0 6px 26px rgba(20,22,30,.1); }
   .page-wrap canvas { display:block; width:100%; }
-  .field { position:absolute; border:2px solid var(--accent); background:rgba(79,70,229,.08); border-radius:5px; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; }
+  .field { position:absolute; border:2px solid var(--accent); background:rgba(106,76,240,.08); border-radius:5px; display:flex; align-items:center; justify-content:center; cursor:pointer; overflow:hidden; }
   .field.filled { border-color:var(--good); background:rgba(23,147,106,.08); }
   .field img { max-width:100%; max-height:100%; }
   .field input[type=text] { border:none; background:transparent; width:100%; height:100%; padding:2px 4px; font-size:13px; font-family:inherit; }
@@ -31,7 +31,7 @@
   .field input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); }
 
   .footbar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
-  .btn { background:var(--accent); color:#fff; border:none; padding:11px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; box-shadow:0 1px 2px rgba(79,70,229,.35); }
+  .btn { background:var(--grad); color:#fff; border:none; padding:11px 20px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:600; box-shadow:0 1px 2px rgba(106,76,240,.35); }
   .btn:hover:not(:disabled) { filter:brightness(1.06); }
   .btn.secondary { background:var(--chip,#f2f2f5); color:var(--ink2); box-shadow:none; }
   .btn.danger { background:#fbf5f5; color:var(--bad); box-shadow:none; }

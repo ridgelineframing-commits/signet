@@ -52,10 +52,10 @@ const tk = {
   activeText: null,
   pendingImage: null,
   ink: { color: "#dc2b3b", width: 3 },
-  shape: { type: "rect", color: "#4f46e5", fill: false, width: 2 },
+  shape: { type: "rect", color: "#6A4CF0", fill: false, width: 2 },
   placeArmed: false,
 };
-const RECIPIENT_COLORS = ["#4f46e5", "#17936a", "#b5760b", "#dc2b3b", "#7a3fb5"];
+const RECIPIENT_COLORS = ["#6A4CF0", "#17936a", "#b5760b", "#dc2b3b", "#7a3fb5"];
 const SVG_NS = "http://www.w3.org/2000/svg";
 // pdf.js render scale: canvas px = PDF points * RENDER_SCALE. Used to keep on-canvas text
 // sizing and vector stroke widths visually consistent with the exported PDF.
@@ -413,7 +413,7 @@ function drawEditTextMarker(box, a) {
   m.textContent = a.text;
   // Until a line is edited it shows the real page underneath (transparent text over a faint
   // tint); editing/focusing reveals the text on an opaque white patch (see .edittext:focus).
-  m.style.background = a.dirty ? "#fff" : (editable ? "rgba(79,70,229,.07)" : "transparent");
+  m.style.background = a.dirty ? "#fff" : (editable ? "rgba(106,76,240,.07)" : "transparent");
   m.style.color = a.dirty ? "#0d0d14" : "transparent";
   a._el = m;
   if (editable) {
@@ -757,7 +757,7 @@ function buildDrawPanel(body) {
     <div class="swrow">
       <button class="sw" data-c="#dc2b3b" style="background:#dc2b3b"></button>
       <button class="sw" data-c="#191b1f" style="background:#191b1f"></button>
-      <button class="sw" data-c="#4f46e5" style="background:#4f46e5"></button>
+      <button class="sw" data-c="#6A4CF0" style="background:#6A4CF0"></button>
       <button class="sw" data-c="#17936a" style="background:#17936a"></button>
       <input type="color" id="inkCustom" value="${tk.ink.color}" style="width:32px;height:32px;border:1px solid var(--line2);border-radius:7px;padding:2px" />
     </div>
@@ -778,7 +778,7 @@ function buildShapePanel(body) {
     </div>
     <div class="label">Color</div>
     <div class="swrow">
-      <button class="sw" data-c="#4f46e5" style="background:#4f46e5"></button>
+      <button class="sw" data-c="#6A4CF0" style="background:#6A4CF0"></button>
       <button class="sw" data-c="#dc2b3b" style="background:#dc2b3b"></button>
       <button class="sw" data-c="#191b1f" style="background:#191b1f"></button>
       <button class="sw" data-c="#17936a" style="background:#17936a"></button>
@@ -1166,7 +1166,7 @@ $("downloadBtn").onclick = async () => { if (!hasDoc()) return; const bytes = aw
 
 // ------------------------------------------------------------------ envelopes: requests drawer
 const STATUS_LABEL = { draft: "Draft", sent: "Sent", partially_signed: "Partially signed", completed: "Completed", voided: "Voided", declined: "Declined" };
-const STATUS_COLOR = { draft: ["#eef2f6", "#5b6068"], sent: ["#eef1ff", "#4f46e5"], partially_signed: ["#fff3e0", "#b5760b"], completed: ["#e4f6ea", "#17936a"], voided: ["#fbf5f5", "#dc2b3b"], declined: ["#fbf5f5", "#dc2b3b"] };
+const STATUS_COLOR = { draft: ["#eef2f6", "#5b6068"], sent: ["#eef1ff", "#6A4CF0"], partially_signed: ["#fff3e0", "#b5760b"], completed: ["#e4f6ea", "#17936a"], voided: ["#fbf5f5", "#dc2b3b"], declined: ["#fbf5f5", "#dc2b3b"] };
 const envelopesPanel = $("envelopesPanelBack");
 $("openEnvelopesBtn").onclick = () => { envelopesPanel.hidden = false; refreshEnvelopes(); };
 $("closeEnvelopesPanel").onclick = () => (envelopesPanel.hidden = true);

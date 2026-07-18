@@ -37,7 +37,7 @@ const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const button = (url, label) =>
-  `<a href="${encodeURI(url)}" style="display:inline-block;background:#4f46e5;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600;font-family:sans-serif">${esc(label)}</a>`;
+  `<a href="${encodeURI(url)}" style="display:inline-block;background:#6A4CF0;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:600;font-family:sans-serif">${esc(label)}</a>`;
 
 const wrap = (body) => `
   <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1a2b3c">
