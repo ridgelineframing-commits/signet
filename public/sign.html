@@ -15,8 +15,10 @@
   [hidden] { display:none !important; }  /* modal-back sets display:flex, which otherwise overrides the hidden attribute */
   body { margin:0; font-family:'Hanken Grotesk',system-ui,sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
   header { background:#fff; color:var(--ink); border-bottom:1px solid var(--line); padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
-  header .brand { font-weight:700; font-size:19px; letter-spacing:-.01em; }
+  header .brand { display:flex; align-items:center; gap:8px; font-weight:700; font-size:19px; letter-spacing:-.01em; }
   header .brand span { color:var(--accent); }
+  .logomark { background:var(--grad); display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; border-radius:7px; width:26px; height:26px; }
+  .logomark svg { width:66%; height:66%; display:block; }
   header .doc-title { font-size:13px; color:var(--sub2); }
   main { max-width:900px; margin:0 auto; padding:20px 16px 100px; }
   .banner { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; font-size:13.5px; color:var(--sub); line-height:1.5; }
@@ -87,7 +89,7 @@
 
 <div id="signApp" hidden>
   <header>
-    <div><div class="brand">Signet<span>.</span></div><div class="doc-title" id="docTitle"></div></div>
+    <div><div class="brand"><span class="logomark"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M26 14 h30 l14 14 v58 a4 4 0 0 1 -4 4 H26 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" fill="#fff"/><path d="M56 14 v14 h14" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="4" stroke-linejoin="round"/><path d="M46 60 v-16 M39 44 h14 M39 60 h14" fill="none" stroke="#6A4CF0" stroke-width="5" stroke-linecap="round"/></svg></span>Signet<span>.</span></div><div class="doc-title" id="docTitle"></div></div>
     <div id="progressLabel" style="font-size:12.5px;color:var(--sub2)"></div>
   </header>
   <main>
