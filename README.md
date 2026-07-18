@@ -108,10 +108,27 @@ redeploy.
 Open the app, log in with `ADMIN_PASSWORD`, and either use the PDF Toolkit tab immediately (no
 setup needed for that half) or create a test envelope addressed to yourself under Envelopes.
 
+## Continuous deployment
+
+The Worker is connected to this GitHub repo via **Cloudflare Workers Builds**, so every push to
+`main` builds and deploys automatically — no manual `npm run deploy` needed. Build settings on
+the `signet` Worker (Settings → Build):
+
+- **Production branch:** `main`
+- **Deploy command:** `npx wrangler deploy`  (no separate build command; there is no `build` script)
+- **Root directory:** `/`
+
+Two things auto-deploy does **not** do:
+
+1. **Database migrations.** Deploys ship code, not schema. Additive column changes must be run
+   once by hand (Cloudflare dashboard → D1 → `signet-db` → Console, or `wrangler d1 execute`).
+   See `migrations/` — e.g. `migrations/001_add_otp.sql` for the email-OTP columns.
+2. **Secrets.** These live on the Worker (`wrangler secret put …`) and persist across deploys.
+
 ## Day-to-day
 
 - `npm run dev` — run locally against a local D1/R2 simulation for testing changes.
-- `npm run deploy` — ship changes.
+- `npm run deploy` — ship changes manually (rarely needed now that pushes to `main` auto-deploy).
 - `npm run tail` — live-stream logs from the deployed Worker (handy if an email doesn't send).
 - Schema changes: edit `schema.sql`, then re-run the relevant migrate command. D1 doesn't
   auto-migrate — for anything beyond the initial load you'll want additive `ALTER TABLE`
