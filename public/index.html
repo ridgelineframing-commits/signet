@@ -8,14 +8,14 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<meta name="theme-color" content="#4f46e5" />
+<meta name="theme-color" content="#6A4CF0" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="Signet" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <link href="./vendor/fonts.css" rel="stylesheet">
 <style>
-:root{--accent:#4f46e5;--ink:#191b1f;--ink2:#24262c;--sub:#5b6068;--sub2:#7c8089;--sub3:#9aa0a8;
+:root{--accent:#6A4CF0;--grad:linear-gradient(135deg,#6A4CF0,#4F86FF);--ink:#191b1f;--ink2:#24262c;--sub:#5b6068;--sub2:#7c8089;--sub3:#9aa0a8;
 --line:#e7e8ec;--line2:#e2e3e8;--bg:#ecebef;--panel:#f7f7f9;--chip:#f2f2f5;
 --good:#17936a;--warn:#b5760b;--bad:#dc2b3b;--badbg:#fbf5f5;--badline:#f0d9d9;}
 *{box-sizing:border-box;}
@@ -26,7 +26,7 @@ button{font:inherit;cursor:pointer;}
 input,select,textarea{font:inherit;}
 .btn{height:36px;padding:0 14px;border:1px solid var(--line2);border-radius:8px;background:#fff;color:var(--ink2);font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;}
 .btn:hover{background:#f7f7f9;}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 1px 2px rgba(79,70,229,.35);}
+.btn.primary{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 1px 2px rgba(106,76,240,.35);}
 .btn.primary:hover{filter:brightness(1.06);}
 .btn.danger{background:var(--bad);border-color:var(--bad);color:#fff;}
 .btn.danger:hover{filter:brightness(1.06);}
@@ -58,7 +58,7 @@ header.topbar{height:56px;flex:0 0 56px;display:flex;align-items:center;gap:14px
 nav.rail{flex:0 0 60px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;overflow-y:auto;}
 nav.rail .railbtn{width:44px;height:44px;border:none;border-radius:9px;color:var(--sub);background:transparent;display:flex;align-items:center;justify-content:center;}
 nav.rail .railbtn:hover{background:var(--chip);}
-nav.rail .railbtn.active{background:var(--accent);color:#fff;box-shadow:0 2px 9px rgba(79,70,229,.34);}
+nav.rail .railbtn.active{background:var(--grad);color:#fff;box-shadow:0 2px 9px rgba(106,76,240,.34);}
 nav.rail .railbtn svg{width:22px;height:22px;display:block;}
 nav.rail .raildiv{width:28px;height:1px;background:#eeeef1;margin:5px 0;}
 
@@ -68,7 +68,7 @@ aside.thumbs .thead{font-size:11px;font-weight:700;letter-spacing:.06em;text-tra
 .thumb{width:118px;border:none;background:transparent;padding:0;display:flex;flex-direction:column;align-items:center;gap:5px;}
 .thumb .card{width:118px;border:1px solid #dfe0e6;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;background:#fff;cursor:grab;}
 .thumb .card canvas{width:100%;display:block;}
-.thumb.current .card{box-shadow:0 0 0 2px var(--accent),0 2px 8px rgba(79,70,229,.2);}
+.thumb.current .card{box-shadow:0 0 0 2px var(--accent),0 2px 8px rgba(106,76,240,.2);}
 .thumb .lbl{font-size:11px;color:var(--sub3);font-weight:500;}
 .thumb.current .lbl{color:var(--accent);font-weight:700;}
 .addpages{width:118px;height:40px;margin:6px auto 0;border:1px dashed #d3d4db;border-radius:8px;background:#fbfbfc;font-size:11.5px;color:var(--sub);}
@@ -105,13 +105,13 @@ aside.props{flex:0 0 300px;background:#fff;border-left:1px solid var(--line);ove
 .tabbtns{display:flex;gap:6px;margin-bottom:14px;}
 .tabbtns button{flex:1;background:var(--chip);border:none;padding:8px 0;border-radius:7px;font-size:12.5px;}
 .tabbtns button.active{background:var(--ink);color:#fff;}
-.marker{position:absolute;border:1.5px dashed var(--accent);background:rgba(79,70,229,.1);font-size:9px;color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.marker{position:absolute;border:1.5px dashed var(--accent);background:rgba(106,76,240,.1);font-size:9px;color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .textmarker{font-family:Helvetica,Arial,sans-serif;cursor:text;min-width:6px;z-index:3;}
 .edittext{position:absolute;white-space:pre-wrap;overflow:hidden;outline:none;line-height:1.05;font-family:Helvetica,Arial,sans-serif;color:#0d0d14;cursor:text;box-sizing:border-box;padding:0 1px;z-index:3;}
 .edittext:focus{box-shadow:0 0 0 1.5px var(--accent);background:#fff !important;color:#0d0d14 !important;}
 .x{position:absolute;width:16px;height:16px;border-radius:50%;border:none;background:var(--bad);color:#fff;font-size:10px;line-height:1;z-index:6;padding:0;}
 .marker .x{top:-8px;right:-8px;}
-.selframe{position:absolute;border:1px dashed var(--accent);background:rgba(79,70,229,.05);cursor:move;z-index:4;}
+.selframe{position:absolute;border:1px dashed var(--accent);background:rgba(106,76,240,.05);cursor:move;z-index:4;}
 .selframe .rz{position:absolute;right:-6px;bottom:-6px;width:12px;height:12px;border-radius:50%;background:#fff;border:1.5px solid var(--accent);cursor:nwse-resize;z-index:7;}
 canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;touch-action:none;background:#fbfbfc;width:100%;}
 
