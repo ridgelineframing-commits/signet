@@ -26,23 +26,46 @@ async function api(path, opts = {}) {
   const token = getToken();
   if (token) headers["Authorization"] = "Bearer " + token;
   const res = await fetch(path, { ...opts, headers });
-  if (res.status === 401) { clearToken(); showLogin(); throw new Error("Not authenticated"); }
+  if (res.status === 401) { clearToken(); throw new Error("Not authenticated"); }
   if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error || "Request failed"); }
   const ct = res.headers.get("content-type") || "";
   return ct.includes("application/json") ? res.json() : res;
 }
-function showLogin() { $("loginScreen").hidden = false; $("app").hidden = true; }
-function showApp() { $("loginScreen").hidden = true; $("app").hidden = false; }
-$("loginBtn").onclick = async () => {
+
+// The PDF editor is open to everyone — no login needed. Sending for signature and viewing
+// requests are the only server-backed features, so we prompt for the shared password on demand.
+let _authResolve = null;
+function openLogin(reason) {
+  $("loginSubtitle").textContent = reason || "Sign in to send documents for signature.";
+  $("loginErr").textContent = "";
+  $("loginPassword").value = "";
+  $("loginScreen").hidden = false;
+  setTimeout(() => $("loginPassword").focus(), 30);
+}
+function closeLogin(result) {
+  $("loginScreen").hidden = true;
+  const resolve = _authResolve; _authResolve = null;
+  if (resolve) resolve(!!result);
+}
+// Resolves true once authenticated, false if the user backs out.
+function ensureAuth(reason) {
+  if (getToken()) return Promise.resolve(true);
+  return new Promise((resolve) => { _authResolve = resolve; openLogin(reason); });
+}
+async function doLogin() {
   const password = $("loginPassword").value;
   try {
     const res = await fetch("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password }) });
     if (!res.ok) throw new Error("wrong");
     const { token } = await res.json();
-    setToken(token); showApp(); refreshEnvelopes();
-  } catch { $("loginErr").textContent = "Wrong password."; }
-};
-if (getToken()) showApp(); else showLogin();
+    setToken(token);
+    closeLogin(true);
+    refreshEnvelopes();
+  } catch { $("loginErr").textContent = "Wrong password. Try again."; }
+}
+$("loginBtn").onclick = doLogin;
+$("loginPassword").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+$("loginCancel").onclick = () => closeLogin(false);
 
 // ------------------------------------------------------------------ core state
 const tk = {
@@ -120,6 +143,44 @@ $("canvasScroll").addEventListener("drop", async (e) => {
   const files = [...e.dataTransfer.files].filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
   if (files.length) { e.preventDefault(); e.stopPropagation(); await loadFiles(files, false); }
 });
+
+// ------------------------------------------------------------------ OS "open with" (file handling + share target)
+// When installed as an app and registered as a PDF handler, the OS launches us with the
+// opened file(s) via the File Handling API. The share_target route redirects here with
+// ?share=1 and the shared PDF sitting in the Cache Storage the service worker stashed it in.
+async function loadLaunchFiles(fileHandles) {
+  const files = [];
+  for (const h of fileHandles) {
+    try { files.push(await h.getFile()); } catch { /* permission or revoked handle */ }
+  }
+  const pdfs = files.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+  if (pdfs.length) { await loadFiles(pdfs, true); toast(`Opened ${pdfs[0].name}`, "success"); }
+}
+if ("launchQueue" in window && "setConsumer" in window.launchQueue) {
+  window.launchQueue.setConsumer((params) => {
+    if (params && params.files && params.files.length) loadLaunchFiles(params.files);
+  });
+}
+// Share target: the service worker caught the POST, stored the file, and redirected here.
+async function consumeSharedFile() {
+  try {
+    const cache = await caches.open("signet-share");
+    const res = await cache.match("shared-pdf");
+    if (!res) return;
+    await cache.delete("shared-pdf");
+    const blob = await res.blob();
+    const name = res.headers.get("x-filename") || "shared.pdf";
+    await loadFiles([new File([blob], name, { type: "application/pdf" })], true);
+    toast(`Opened ${name}`, "success");
+  } catch { /* nothing shared */ }
+}
+if (new URLSearchParams(location.search).get("share")) {
+  consumeSharedFile();
+  history.replaceState(null, "", location.pathname);
+}
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => { /* SW is best-effort; app works without it */ });
+}
 
 // ------------------------------------------------------------------ render engine
 // Rendering (thumbnails + main canvas) reads through pdf.js, which needs the
@@ -978,6 +1039,16 @@ function buildOrganizePanel(body) {
     </div>
     <button class="btn" id="orgExtract" style="width:100%;justify-content:center;margin-bottom:8px">Extract this page → new PDF</button>
     <button class="btn" id="orgInsertBlank" style="width:100%;justify-content:center">+ Insert blank page after</button>
+    <div class="label" style="margin-top:16px">Whole document</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <button class="btn" id="orgRotAll" style="flex-direction:column;height:60px">⟳<br><span style="font-size:11px">Rotate all 90°</span></button>
+      <button class="btn" id="orgReverse" style="flex-direction:column;height:60px">⇅<br><span style="font-size:11px">Reverse order</span></button>
+    </div>
+    <div class="label">Extract a range</div>
+    <div style="display:flex;gap:8px">
+      <input id="orgRange" type="text" placeholder="e.g. 1-3, 5" style="flex:1" />
+      <button class="btn" id="orgRangeGo" style="justify-content:center;white-space:nowrap">Extract →</button>
+    </div>
     <p class="hint" style="margin-top:14px">Tip: drag pages in the rail on the left to reorder them.</p>`;
   $("orgRotL").onclick = () => rotateCurrent(-90);
   $("orgRotR").onclick = () => rotateCurrent(90);
@@ -985,6 +1056,10 @@ function buildOrganizePanel(body) {
   $("orgDel").onclick = deleteCurrent;
   $("orgExtract").onclick = extractCurrent;
   $("orgInsertBlank").onclick = insertBlankAfterCurrent;
+  $("orgRotAll").onclick = rotateAll;
+  $("orgReverse").onclick = reversePages;
+  $("orgRangeGo").onclick = extractRange;
+  $("orgRange").addEventListener("keydown", (e) => { if (e.key === "Enter") extractRange(); });
 }
 function rotateCurrent(delta) {
   const page = tk.pdfDoc.getPage(tk.order[tk.currentPage]);
@@ -1018,6 +1093,62 @@ function insertBlankAfterCurrent() {
   tk.order.splice(tk.currentPage + 1, 0, newIdx);
   invalidateRender();
   fullRerender();
+}
+// Rotate every page 90° clockwise — handy for a whole scan that came in sideways.
+function rotateAll() {
+  for (const idx of tk.order) {
+    const page = tk.pdfDoc.getPage(idx);
+    page.setRotation(degrees((page.getRotation().angle + 90) % 360));
+  }
+  invalidateRender();
+  fullRerender();
+  toast("Rotated all pages.", "success");
+}
+function reversePages() {
+  if (tk.order.length <= 1) return;
+  const n = tk.order.length;
+  tk.order.reverse();
+  // annotations are keyed by display-position, so flip their page index too
+  tk.annos = tk.annos.map((a) => ({ ...a, page: n - 1 - a.page }));
+  tk.currentPage = n - 1 - tk.currentPage;
+  invalidateRender();
+  fullRerender();
+  toast("Reversed page order.", "success");
+}
+// Parse a range spec like "1-3, 5, 8-10" into 1-based page numbers, then extract those
+// pages (in document order, de-duplicated) to a fresh downloaded PDF.
+function parsePageRange(spec, max) {
+  const out = [];
+  for (const part of String(spec).split(",")) {
+    const t = part.trim();
+    if (!t) continue;
+    const m = t.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m) {
+      let [a, b] = [parseInt(m[1], 10), parseInt(m[2], 10)];
+      if (a > b) [a, b] = [b, a];
+      for (let i = a; i <= b; i++) out.push(i);
+    } else if (/^\d+$/.test(t)) {
+      out.push(parseInt(t, 10));
+    } else {
+      return null; // malformed token
+    }
+  }
+  const uniq = [...new Set(out)].filter((n) => n >= 1 && n <= max);
+  return uniq;
+}
+async function extractRange() {
+  const spec = $("orgRange").value.trim();
+  if (!spec) return toast("Enter a page range, e.g. 1-3, 5.", "error");
+  const nums = parsePageRange(spec, tk.order.length);
+  if (nums === null) return toast("Couldn't read that range. Try something like 1-3, 5.", "error");
+  if (!nums.length) return toast("No pages in that range.", "error");
+  const newDoc = await PDFDocument.create();
+  const srcIndices = nums.map((n) => tk.order[n - 1]);
+  const copied = await newDoc.copyPages(tk.pdfDoc, srcIndices);
+  copied.forEach((p) => newDoc.addPage(p));
+  const base = (tk.fileName || "document").replace(/\.pdf$/i, "");
+  downloadBytes(await newDoc.save(), `${base}-pages-${nums.join("_")}.pdf`);
+  toast(`Extracted ${nums.length} page${nums.length > 1 ? "s" : ""}.`, "success");
 }
 
 // ------------------------------------------------------------------ bake / export / flatten
@@ -1168,7 +1299,7 @@ $("downloadBtn").onclick = async () => { if (!hasDoc()) return; const bytes = aw
 const STATUS_LABEL = { draft: "Draft", sent: "Sent", partially_signed: "Partially signed", completed: "Completed", voided: "Voided", declined: "Declined" };
 const STATUS_COLOR = { draft: ["#eef2f6", "#5b6068"], sent: ["#eef1ff", "#6A4CF0"], partially_signed: ["#fff3e0", "#b5760b"], completed: ["#e4f6ea", "#17936a"], voided: ["#fbf5f5", "#dc2b3b"], declined: ["#fbf5f5", "#dc2b3b"] };
 const envelopesPanel = $("envelopesPanelBack");
-$("openEnvelopesBtn").onclick = () => { envelopesPanel.hidden = false; refreshEnvelopes(); };
+$("openEnvelopesBtn").onclick = async () => { if (!(await ensureAuth("Sign in to view your signature requests."))) return; envelopesPanel.hidden = false; refreshEnvelopes(); };
 $("closeEnvelopesPanel").onclick = () => (envelopesPanel.hidden = true);
 
 async function refreshEnvelopes() {
@@ -1250,6 +1381,7 @@ function openEnvelopeWizard(presetFile, presetTitle) {
 $("envCancel").onclick = () => (envModal.hidden = true);
 $("requestSigBtn").onclick = async () => {
   if (!hasDoc()) return;
+  if (!(await ensureAuth("Sign in to send this document for signature."))) return;
   const bytes = await bakeAndExport();
   const file = new File([bytes], (tk.fileName || "edited-document.pdf"), { type: "application/pdf" });
   openEnvelopeWizard(file);

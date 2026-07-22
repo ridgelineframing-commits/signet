@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "construction.ridgeline.signet",
+      "sha256_cert_fingerprints": [
+        "FC:09:4E:D2:39:DC:B9:84:51:D3:78:ED:4C:B4:47:8D:ED:C5:85:C6:3A:9B:ED:E9:69:CA:39:90:19:AE:6D:29"
+      ]
+    }
+  }
+]

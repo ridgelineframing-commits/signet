@@ -134,6 +134,43 @@ Two things auto-deploy does **not** do:
   auto-migrate — for anything beyond the initial load you'll want additive `ALTER TABLE`
   statements run by hand so you don't wipe existing envelopes.
 
+## Install it as an app (PDF "Open with")
+
+Signet is a PWA, so on any device it can be installed and registered as a PDF handler —
+open a PDF from your file manager / email and it launches straight into the editor, no
+browser chrome.
+
+- **Desktop (Chrome/Edge) & ChromeOS:** visit the site, install it (the install icon in the
+  address bar, or ⋮ → *Install Signet*). Once installed it registers as a `.pdf` handler and
+  appears in the OS "Open with" list. You can also *share* a PDF to it.
+- **iPad/iPhone (Safari):** *Share → Add to Home Screen*. iOS doesn't expose a system-wide
+  default-PDF-app hook to web apps, but the installed icon opens the full editor and you can
+  *Share → Signet* a PDF into it.
+- **Android tablets:** install the signed **APK** below — it registers as a real PDF viewer,
+  so "Open with → Signet" and "set as default" work like any native app.
+
+### Android APK (for the tablets)
+
+`android/` holds a [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap) Trusted Web
+Activity project that wraps the live site in a native shell with a PDF `VIEW` intent filter
+(and the share target). To (re)build:
+
+```bash
+cd android
+./build-apk.sh          # installs Bubblewrap + its own JDK/SDK on first run, then builds
+```
+
+Output is `android/app-release-signed.apk` — sideload it (`adb install -r app-release-signed.apk`,
+or copy it over and tap it with "install from this source" allowed). On first launch Android
+verifies the app against `https://signet.ridgeline.workers.dev/.well-known/assetlinks.json`;
+that file publishes the signing key's SHA-256 fingerprint, which is what lets the app open the
+site (and PDFs) full-screen without an address bar.
+
+**Keep `android/signet-release.keystore` safe and backed up** (it's gitignored — a signing key
+is a secret). You need the *same* keystore to ship any future update, and its fingerprint must
+match `assetlinks.json`. If you ever regenerate the keystore, update the fingerprint in
+`public/.well-known/assetlinks.json` (the script prints it) and redeploy before installing.
+
 ## Notes & honest limitations
 
 - **Email OTP for signing (optional).** When creating a signature request you can tick

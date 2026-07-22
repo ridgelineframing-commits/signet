@@ -38,10 +38,13 @@ input[type=text],input[type=email],input[type=number],input[type=password],selec
 .label{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--sub3);margin-bottom:9px;}
 .hint{font-size:12px;color:var(--sub2);line-height:1.5;}
 
-#loginScreen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+#loginScreen{position:fixed;inset:0;z-index:70;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
   background:radial-gradient(120% 120% at 15% 0%,#3a2a72 0%,#201a3a 45%,#14111f 100%);}
+#loginScreen[hidden]{display:none;}
 #loginScreen .logomark.big{margin-bottom:0;}
-#loginScreen .box{background:#fff;padding:32px;border-radius:16px;width:320px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.4);}
+#loginScreen .box{position:relative;background:#fff;padding:32px;border-radius:16px;width:320px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.4);}
+#loginScreen #loginCancel{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--sub);cursor:pointer;padding:2px 6px;}
+#loginScreen #loginCancel:hover{color:var(--ink);}
 #loginScreen .box h1{font-size:22px;margin:0 0 4px;}
 #loginScreen .box p{color:var(--sub);font-size:13px;margin:0 0 18px;}
 #loginScreen input{width:100%;margin-bottom:10px;}
@@ -218,18 +221,19 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 </head>
 <body>
 
-<div id="loginScreen">
+<div id="loginScreen" hidden>
   <div class="logomark big"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M26 14 h30 l14 14 v58 a4 4 0 0 1 -4 4 H26 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" fill="#fff"/><path d="M56 14 v14 h14" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="4" stroke-linejoin="round"/><path d="M46 60 v-16 M39 44 h14 M39 60 h14" fill="none" stroke="#6A4CF0" stroke-width="5" stroke-linecap="round"/></svg></div>
   <div class="box">
+    <button id="loginCancel" title="Close" aria-label="Close">&times;</button>
     <h1>Signet<span style="color:var(--accent)">.</span></h1>
-    <p>PDF editor, with signing built in</p>
+    <p id="loginSubtitle">Sign in to send documents for signature.</p>
     <input id="loginPassword" type="password" placeholder="Password" />
-    <button class="btn primary" style="width:100%;justify-content:center" id="loginBtn">Unlock</button>
+    <button class="btn primary" style="width:100%;justify-content:center" id="loginBtn">Sign in</button>
     <div class="err" id="loginErr"></div>
   </div>
 </div>
 
-<div id="app" hidden>
+<div id="app">
   <header class="topbar">
     <button class="icon-btn mobile-only" id="pagesToggle" title="Pages" hidden>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg></button>
