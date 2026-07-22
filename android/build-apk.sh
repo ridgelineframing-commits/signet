@@ -35,17 +35,22 @@ fi
 # Regenerate the Android project from twa-manifest.json (no build yet).
 bubblewrap update --skipVersionUpgrade
 
-# --- Pin to a RELEASED Android SDK -------------------------------------------
-# Bubblewrap's current default compiles against the newest *preview* SDK (via an
-# alpha androidx.browser) — e.g. compileSdk 36 (Android 16). APKs built against an
-# unreleased/preview SDK cannot be installed on shipping devices: they fail with
-# "There was a problem parsing the package." We pin to the latest *released* API
-# (34 / Android 14) and the matching stable browser-helper so the APK installs on
-# any Android 5.0+ tablet.
+# --- Patch the generated project so the APK actually installs ----------------
+# Two fixes, both of which otherwise produce "There was a problem parsing the
+# package" on shipping tablets:
+#   1. Bubblewrap's default compiles against the newest *preview* SDK (via an
+#      alpha androidx.browser) — e.g. compileSdk 36 (Android 16). APKs built
+#      against an unreleased/preview SDK only install on that same preview build.
+#      Pin to the latest *released* API (34 / Android 14) + stable browser-helper.
+#   2. `bubblewrap update --skipVersionUpgrade` leaves versionName empty, and many
+#      Android installers reject an empty versionName. Set it from twa-manifest.json.
+VERSION_NAME=$(sed -n 's/.*"appVersionName":[[:space:]]*"\([^"]*\)".*/\1/p' twa-manifest.json)
+VERSION_NAME=${VERSION_NAME:-1.0.0}
 sed -i.bak -E \
   -e 's/compileSdkVersion[[:space:]]+[0-9]+/compileSdkVersion 34/' \
   -e 's/targetSdkVersion[[:space:]]+[0-9]+/targetSdkVersion 34/' \
   -e 's/androidbrowserhelper:[0-9.]+([-a-z0-9]*)?/androidbrowserhelper:2.5.0/' \
+  -e "s/versionName \"\"/versionName \"${VERSION_NAME}\"/" \
   app/build.gradle && rm -f app/build.gradle.bak
 
 # Build + sign the release APK against the patched (released-SDK) project. The
