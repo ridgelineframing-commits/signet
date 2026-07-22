@@ -32,7 +32,25 @@ if [ ! -f signet-release.keystore ]; then
   echo ">>> …then redeploy the Worker so the new fingerprint is live before installing."
 fi
 
-# Regenerate the Android project from twa-manifest.json and build a signed release APK.
+# Regenerate the Android project from twa-manifest.json (no build yet).
+bubblewrap update --skipVersionUpgrade
+
+# --- Pin to a RELEASED Android SDK -------------------------------------------
+# Bubblewrap's current default compiles against the newest *preview* SDK (via an
+# alpha androidx.browser) — e.g. compileSdk 36 (Android 16). APKs built against an
+# unreleased/preview SDK cannot be installed on shipping devices: they fail with
+# "There was a problem parsing the package." We pin to the latest *released* API
+# (34 / Android 14) and the matching stable browser-helper so the APK installs on
+# any Android 5.0+ tablet.
+sed -i.bak -E \
+  -e 's/compileSdkVersion[[:space:]]+[0-9]+/compileSdkVersion 34/' \
+  -e 's/targetSdkVersion[[:space:]]+[0-9]+/targetSdkVersion 34/' \
+  -e 's/androidbrowserhelper:[0-9.]+([-a-z0-9]*)?/androidbrowserhelper:2.5.0/' \
+  app/build.gradle && rm -f app/build.gradle.bak
+
+# Build + sign the release APK against the patched (released-SDK) project. The
+# checksum from `update` still matches twa-manifest.json, so this won't regenerate
+# and clobber the patch above.
 bubblewrap build --skipPwaValidation
 
 echo
