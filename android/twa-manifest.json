@@ -1,0 +1,53 @@
+{
+  "packageId": "construction.ridgeline.signet",
+  "host": "signet.ridgeline.workers.dev",
+  "name": "Signet",
+  "launcherName": "Signet",
+  "display": "standalone",
+  "orientation": "default",
+  "themeColor": "#6A4CF0",
+  "themeColorDark": "#14111f",
+  "navigationColor": "#14111f",
+  "navigationColorDark": "#14111f",
+  "navigationDividerColor": "#14111f",
+  "navigationDividerColorDark": "#14111f",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://signet.ridgeline.workers.dev/icon-512.png",
+  "maskableIconUrl": "https://signet.ridgeline.workers.dev/icon-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./signet-release.keystore",
+    "alias": "signet"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shellApp": false,
+  "webManifestUrl": "https://signet.ridgeline.workers.dev/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://signet.ridgeline.workers.dev/",
+  "minSdkVersion": 21,
+  "shortcuts": [],
+  "fileHandlers": [
+    {
+      "actionUrl": "https://signet.ridgeline.workers.dev/",
+      "mimeTypes": ["application/pdf"]
+    }
+  ],
+  "shareTarget": {
+    "action": "https://signet.ridgeline.workers.dev/share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [{ "name": "file", "accept": ["application/pdf", ".pdf"] }]
+    }
+  },
+  "protocolHandlers": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": []
+}
