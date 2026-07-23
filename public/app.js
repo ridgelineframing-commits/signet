@@ -318,6 +318,25 @@ $("propsClose").onclick = closePropsSheet;
 // Leaving mobile width resets any mobile drawers/sheets so the desktop layout is clean.
 window.matchMedia("(max-width:820px)").addEventListener("change", (e) => { if (!e.matches) { closeThumbs(); closePropsSheet(); } });
 
+// ---------------------------------------------------------------- collapsible side panels (desktop)
+// The Pages rail (left) and the info/properties panel (right) can each be
+// collapsed from the top bar to give the page more room; the choice is
+// remembered. On mobile these panels are already slide-in sheets, so the
+// collapse rules are scoped to wide screens in CSS.
+const PANELS_KEY = "signet.panels";
+function loadPanelPrefs() { try { return JSON.parse(localStorage.getItem(PANELS_KEY)) || {}; } catch { return {}; } }
+function applyPanelPrefs() {
+  const p = loadPanelPrefs();
+  document.body.classList.toggle("thumbs-collapsed", !!p.thumbsCollapsed);
+  document.body.classList.toggle("props-collapsed", !!p.propsCollapsed);
+  $("togglePages").classList.toggle("on", !p.thumbsCollapsed);
+  $("toggleProps").classList.toggle("on", !p.propsCollapsed);
+}
+function setPanelPref(key, val) { const p = loadPanelPrefs(); p[key] = val; try { localStorage.setItem(PANELS_KEY, JSON.stringify(p)); } catch {} applyPanelPrefs(); }
+$("togglePages").onclick = () => setPanelPref("thumbsCollapsed", !document.body.classList.contains("thumbs-collapsed"));
+$("toggleProps").onclick = () => setPanelPref("propsCollapsed", !document.body.classList.contains("props-collapsed"));
+applyPanelPrefs();
+
 // ------------------------------------------------------------------ marker drawing + canvas interaction
 function drawMarker(box, a) {
   if (a.kind === "ink" || a.kind === "shape") return drawVectorMarker(box, a);
@@ -912,8 +931,26 @@ function buildTextPanel(body) {
 }
 
 let sigPadCtx = null, sigDrawing = false, sigLast = null, sigActiveTab = "draw", sigUploadDataUrl = null;
+// Saved signatures — persisted in the browser so you can reuse them on every
+// document without redrawing. Purely local (localStorage); nothing is uploaded
+// and no sign-in is involved.
+const SIGS_KEY = "signet.savedSigs";
+function loadSavedSigs() { try { return JSON.parse(localStorage.getItem(SIGS_KEY)) || []; } catch { return []; } }
+function saveSavedSigs(a) { try { localStorage.setItem(SIGS_KEY, JSON.stringify(a.slice(0, 8))); } catch { toast("Couldn't save — browser storage is full.", "error"); } }
+function addSavedSig(dataUrl) { const a = loadSavedSigs(); a.unshift({ id: "s" + Date.now().toString(36), dataUrl }); saveSavedSigs(a); }
+function removeSavedSig(id) { saveSavedSigs(loadSavedSigs().filter((s) => s.id !== id)); }
+
 function buildSigPanel(body) {
+  const saved = loadSavedSigs();
   body.innerHTML = `
+    ${saved.length ? `
+    <div class="label">Your saved signatures</div>
+    <div class="sigsaved" id="sigSaved">
+      ${saved.map((s) => `<button type="button" class="sigthumb" data-id="${s.id}" title="Click, then click the page to drop it"><img src="${s.dataUrl}" alt="Saved signature" /><span class="x" data-del="${s.id}" title="Remove">&times;</span></button>`).join("")}
+    </div>
+    <p class="hint" style="margin:5px 0 16px">Click one, then click the page to drop it. No sign-in needed.</p>
+    <div class="label">Create a new signature</div>`
+    : `<p class="hint" style="margin-bottom:12px">Draw, type, or upload your signature once, then save it to reuse on every document — no sign-in needed.</p>`}
     <div class="tabbtns">
       <button data-t="draw" class="${sigActiveTab === "draw" ? "active" : ""}">Draw</button>
       <button data-t="type" class="${sigActiveTab === "type" ? "active" : ""}">Type</button>
@@ -929,9 +966,21 @@ function buildSigPanel(body) {
     <div id="sTabUpload" ${sigActiveTab !== "upload" ? "hidden" : ""}>
       <input type="file" id="sigUploadInput" accept="image/*" style="width:100%" />
     </div>
-    <button class="btn primary" id="placeSigBtn" style="width:100%;justify-content:center;margin-top:16px">${tk.placeArmed && tk.pendingSig?.kind === "signature" ? "Click the page to place…" : "Place signature → click on page"}</button>
+    <button class="btn" id="saveSigBtn" style="width:100%;justify-content:center;margin-top:14px">&#43; Save for reuse</button>
+    <button class="btn primary" id="placeSigBtn" style="width:100%;justify-content:center;margin-top:8px">${tk.placeArmed && tk.pendingSig?.kind === "signature" ? "Click the page to place…" : "Place signature → click page"}</button>
     <button class="btn" id="placeInitBtn" style="width:100%;justify-content:center;margin-top:8px">${tk.placeArmed && tk.pendingSig?.kind === "initials" ? "Click the page to place…" : "Place initials"}</button>`;
   document.querySelectorAll('#propsBody .tabbtns button').forEach((b) => (b.onclick = () => { sigActiveTab = b.dataset.t; renderPropsPanel(); }));
+  body.querySelectorAll('#sigSaved .sigthumb').forEach((el) => {
+    el.onclick = (e) => {
+      const del = e.target.getAttribute && e.target.getAttribute("data-del");
+      if (del) { e.stopPropagation(); removeSavedSig(del); renderPropsPanel(); return; }
+      const s = loadSavedSigs().find((x) => x.id === el.dataset.id);
+      if (!s) return;
+      tk.pendingSig = { dataUrl: s.dataUrl, kind: "signature" }; tk.placeArmed = true;
+      if (isMobile()) toast("Now tap the page to drop your signature.");
+      renderPropsPanel();
+    };
+  });
   if (sigActiveTab === "draw") {
     const pad = $("sigPad"); sigPadCtx = pad.getContext("2d");
     sigPadCtx.lineWidth = 2.4; sigPadCtx.strokeStyle = "#16232f"; sigPadCtx.lineCap = "round";
@@ -958,6 +1007,10 @@ function buildSigPanel(body) {
     }
     return sigUploadDataUrl;
   }
+  $("saveSigBtn").onclick = async () => {
+    const dataUrl = await buildDataUrl(); if (!dataUrl) return toast("Draw, type, or upload a signature first.", "error");
+    addSavedSig(dataUrl); toast("Signature saved — reuse it any time.", "success"); renderPropsPanel();
+  };
   $("placeSigBtn").onclick = async () => {
     const dataUrl = await buildDataUrl(); if (!dataUrl) return toast("Draw, type, or upload a signature first.", "error");
     tk.pendingSig = { dataUrl, kind: "signature" }; tk.placeArmed = true; renderPropsPanel();
