@@ -57,7 +57,7 @@ fi
 bubblewrap update --skipVersionUpgrade
 
 # --- Patch the generated project so the APK actually installs ----------------
-# Two fixes, both of which otherwise produce "There was a problem parsing the
+# Three fixes, all of which otherwise produce "There was a problem parsing the
 # package" on shipping tablets:
 #   1. Bubblewrap's default compiles against the newest *preview* SDK (via an
 #      alpha androidx.browser) — e.g. compileSdk 36 (Android 16). APKs built
@@ -65,6 +65,12 @@ bubblewrap update --skipVersionUpgrade
 #      Pin to the latest *released* API (34 / Android 14) + stable browser-helper.
 #   2. `bubblewrap update --skipVersionUpgrade` leaves versionName empty, and many
 #      Android installers reject an empty versionName. Set it from twa-manifest.json.
+#   3. Bubblewrap copies the web share-target / file-handler "accept" list straight
+#      into <data android:mimeType="…"> elements. A bare file extension there (e.g.
+#      ".pdf") is NOT a valid MIME type — at install the package parser throws
+#      MalformedMimeTypeException and rejects the WHOLE apk. twa-manifest.json is
+#      kept clean, but strip any slash-less mimeType from the generated manifest
+#      too, as a belt-and-suspenders guard against bubblewrap reintroducing one.
 VERSION_NAME=$(sed -n 's/.*"appVersionName":[[:space:]]*"\([^"]*\)".*/\1/p' twa-manifest.json)
 VERSION_NAME=${VERSION_NAME:-1.0.0}
 sed -i.bak -E \
@@ -73,6 +79,14 @@ sed -i.bak -E \
   -e 's/androidbrowserhelper:[0-9.]+([-a-z0-9]*)?/androidbrowserhelper:2.5.0/' \
   -e "s/versionName \"\"/versionName \"${VERSION_NAME}\"/" \
   app/build.gradle && rm -f app/build.gradle.bak
+
+# Delete any <data android:mimeType="…"> whose value has no "/" (an invalid MIME
+# type that would abort package parsing at install time).
+MANIFEST=app/src/main/AndroidManifest.xml
+if [ -f "$MANIFEST" ]; then
+  sed -i.bak -E '/<data[[:space:]][^>]*android:mimeType="[^"\/]*"/d' "$MANIFEST" \
+    && rm -f "$MANIFEST.bak"
+fi
 
 # Build + sign the release APK against the patched (released-SDK) project. The
 # checksum from `update` still matches twa-manifest.json, so this won't regenerate
