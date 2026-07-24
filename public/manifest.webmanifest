@@ -17,7 +17,18 @@
   "file_handlers": [
     {
       "action": "/",
-      "accept": { "application/pdf": [".pdf"] },
+      "accept": {
+        "application/pdf": [".pdf"],
+        "image/jpeg": [".jpg", ".jpeg"],
+        "image/png": [".png"],
+        "image/gif": [".gif"],
+        "image/webp": [".webp"],
+        "image/bmp": [".bmp"],
+        "text/plain": [".txt"],
+        "text/csv": [".csv"],
+        "text/markdown": [".md"],
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"]
+      },
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }],
       "launch_type": "single-client"
     }
@@ -27,7 +38,7 @@
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
-      "files": [{ "name": "file", "accept": ["application/pdf", ".pdf"] }]
+      "files": [{ "name": "file", "accept": ["application/pdf", "image/*", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] }]
     }
   }
 }

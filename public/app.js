@@ -268,8 +268,9 @@ async function consumeSharedFile() {
     await cache.delete("shared-pdf");
     const blob = await res.blob();
     const name = res.headers.get("x-filename") || "shared.pdf";
-    await loadFiles([new File([blob], name, { type: "application/pdf" })], true);
-    toast(`Opened ${name}`, "success");
+    const type = res.headers.get("content-type") || "";
+    const ok = await loadFiles([new File([blob], name, { type })], true);
+    if (ok) toast(`Opened ${name}`, "success");
   } catch { /* nothing shared */ }
 }
 if (new URLSearchParams(location.search).get("share")) {
