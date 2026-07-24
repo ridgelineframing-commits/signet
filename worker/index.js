@@ -325,6 +325,12 @@ app.get("/api/sign/:token/final", async (c) => {
   return new Response(obj.body, { headers: { "content-type": "application/pdf" } });
 });
 
+// Share-target fallback. When a PDF is shared into the installed app, the service
+// worker normally intercepts this POST, stashes the file, and redirects to /?share=1.
+// If the SW isn't active yet (very first share after install), the POST reaches the
+// network instead — redirect to the app so it opens cleanly rather than 404-ing.
+app.post("/share-target", (c) => c.redirect("/?share=1", 303));
+
 // Anything else under /api/* that didn't match above is a genuine 404 — Cloudflare
 // already serves every real static file in ./public before the Worker ever runs
 // (see the [assets] block in wrangler.toml), so we don't need a manual fallback here.

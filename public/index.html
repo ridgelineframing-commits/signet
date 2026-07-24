@@ -306,16 +306,16 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
       <div class="thead">Pages</div>
       <div class="thumblist" id="thumbList"></div>
       <button class="addpages" id="addPagesBtn" hidden>+ Add pages</button>
-      <input type="file" id="addPagesInput" accept="application/pdf" multiple hidden />
+      <input type="file" id="addPagesInput" accept=".pdf,application/pdf,image/*,.txt,.md,.csv,text/plain,.docx" multiple hidden />
     </aside>
 
     <div class="canvaswrap">
       <div class="canvasscroll" id="canvasScroll">
         <div class="empty-state" id="emptyState">
           <div class="logomark big" style="margin:0 auto 4px"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M26 14 h30 l14 14 v58 a4 4 0 0 1 -4 4 H26 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" fill="#fff"/><path d="M56 14 v14 h14" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="4" stroke-linejoin="round"/><path d="M46 60 v-16 M39 44 h14 M39 60 h14" fill="none" stroke="#6A4CF0" stroke-width="5" stroke-linecap="round"/></svg></div>
-          <h2>Drop a PDF here</h2>
-          <p>...or click to browse. Pick one file to edit, or several to merge them in order.</p>
-          <input type="file" id="fileInput" accept="application/pdf" multiple />
+          <h2>Drop a PDF, image, or Word file here</h2>
+          <p>...or click to browse. PDFs, JPG/PNG images, .txt and .docx all open here — pick several to merge them in order.</p>
+          <input type="file" id="fileInput" accept=".pdf,application/pdf,image/*,.txt,.md,.csv,text/plain,.docx" multiple />
         </div>
         <div class="pageshell" id="pageShell" hidden></div>
       </div>

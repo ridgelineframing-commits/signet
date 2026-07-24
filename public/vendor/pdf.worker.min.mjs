@@ -1,3 +1,10 @@
+/* signet compat shim: back-fill recent JS APIs pdf.js calls, for older phone/tablet browsers & WebViews (prepended by the build; see CLAUDE.md). */
+(function(){function def(C,n,f){if(C&&C.prototype&&!C.prototype[n]){Object.defineProperty(C.prototype,n,{value:f,writable:true,configurable:true,enumerable:false});}}
+function goic(k,f){if(this.has(k))return this.get(k);var v=f(k);this.set(k,v);return v;}
+if(typeof Map!=="undefined")def(Map,"getOrInsertComputed",goic);
+if(typeof WeakMap!=="undefined")def(WeakMap,"getOrInsertComputed",goic);
+def(Array,"findLast",function(cb,t){for(var i=this.length-1;i>=0;i--){if(cb.call(t,this[i],i,this))return this[i];}});
+if(typeof Promise!=="undefined"&&!Promise.withResolvers){Promise.withResolvers=function(){var a,b,p=new Promise(function(r,j){a=r;b=j;});return{promise:p,resolve:a,reject:b};};}})();
 /**
  * @licstart The following is the entire license notice for the
  * JavaScript code in this page

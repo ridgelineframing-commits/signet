@@ -101,15 +101,111 @@ const TOOL_LABELS = {
 
 function hasDoc() { return !!tk.pdfDoc && tk.order.length > 0; }
 
-async function loadFiles(files, replacing) {
-  if (replacing || !tk.pdfDoc) { tk.pdfDoc = await PDFDocument.create(); tk.order = []; tk.annos = []; tk.currentPage = 0; }
-  for (const file of files) {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
-    const copied = await tk.pdfDoc.copyPages(src, src.getPageIndices());
-    for (const p of copied) { const idx = tk.pdfDoc.getPageCount(); tk.pdfDoc.addPage(p); tk.order.push(idx); }
-    if (replacing || !tk.fileName) tk.fileName = file.name;
+// ------------------------------------------------------------- open non-PDF files as PDF
+// Everything that enters the editor flows through loadFiles(). Images (.jpg/.png/…),
+// plain text (.txt/.md/.csv), and Word (.docx) are converted to a PDF here first, so a
+// single conversion layer covers the file picker, drag-drop, and the OS "open with" path.
+async function coerceToPdfBytes(file) {
+  const name = (file.name || "").toLowerCase();
+  const type = file.type || "";
+  if (type === "application/pdf" || name.endsWith(".pdf")) return new Uint8Array(await file.arrayBuffer());
+  if (type.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp)$/.test(name)) return await imageToPdfBytes(file);
+  if (type.startsWith("text/") || /\.(txt|md|markdown|csv|log)$/.test(name)) return await textToPdfBytes(await file.text());
+  if (name.endsWith(".docx")) return await docxToPdfBytes(file);
+  if (name.endsWith(".doc")) throw new Error("legacy .doc isn't supported — save it as .docx or PDF");
+  throw new Error("unsupported file type");
+}
+async function rasterToPng(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("couldn't read image")); im.src = url; });
+    const c = document.createElement("canvas"); c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+    c.getContext("2d").drawImage(img, 0, 0);
+    const blob = await new Promise((res) => c.toBlob(res, "image/png"));
+    return new Uint8Array(await blob.arrayBuffer());
+  } finally { URL.revokeObjectURL(url); }
+}
+async function imageToPdfBytes(file) {
+  const name = (file.name || "").toLowerCase();
+  const isPng = file.type === "image/png" || name.endsWith(".png");
+  const isJpg = file.type === "image/jpeg" || /\.jpe?g$/.test(name);
+  const pdf = await PDFDocument.create();
+  let img;
+  if (isPng) img = await pdf.embedPng(new Uint8Array(await file.arrayBuffer()));
+  else if (isJpg) img = await pdf.embedJpg(new Uint8Array(await file.arrayBuffer()));
+  else img = await pdf.embedPng(await rasterToPng(file)); // webp/gif/bmp → png via canvas
+  const cap = 1400, s = Math.min(cap / Math.max(img.width, img.height), 1);
+  const w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+  pdf.addPage([w, h]).drawImage(img, { x: 0, y: 0, width: w, height: h });
+  return await pdf.save();
+}
+async function textToPdfBytes(text) {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const size = 11, lh = size * 1.5, margin = 54, PW = 612, PH = 792, maxW = PW - margin * 2;
+  const clean = String(text).replace(/\t/g, "    ").replace(/[^\n\x20-\x7E\xA0-\xFF]/g, "?");
+  const fits = (str) => font.widthOfTextAtSize(str, size) <= maxW;
+  const out = [];
+  for (const para of clean.split(/\r?\n/)) {
+    if (!para) { out.push(""); continue; }
+    let line = "";
+    for (let word of para.split(" ")) {
+      while (!fits(word) && word.length > 1) { // hard-break a word longer than the line
+        let i = word.length; while (i > 1 && !fits(word.slice(0, i))) i--;
+        if (line) { out.push(line); line = ""; }
+        out.push(word.slice(0, i)); word = word.slice(i);
+      }
+      const cand = line ? line + " " + word : word;
+      if (fits(cand)) line = cand; else { if (line) out.push(line); line = word; }
+    }
+    out.push(line);
   }
+  let page = pdf.addPage([PW, PH]), y = PH - margin;
+  for (const line of out) {
+    if (y - size < margin) { page = pdf.addPage([PW, PH]); y = PH - margin; }
+    if (line) page.drawText(line, { x: margin, y: y - size, size, font, color: rgb(0.05, 0.05, 0.08) });
+    y -= lh;
+  }
+  return await pdf.save();
+}
+let _mammothPromise;
+function loadMammoth() {
+  _mammothPromise ||= new Promise((resolve, reject) => {
+    if (window.mammoth) return resolve(window.mammoth);
+    const s = document.createElement("script");
+    s.src = "./vendor/mammoth.browser.min.js";
+    s.onload = () => (window.mammoth ? resolve(window.mammoth) : reject(new Error("Word support failed to load")));
+    s.onerror = () => reject(new Error("Word support failed to load"));
+    document.head.appendChild(s);
+  });
+  return _mammothPromise;
+}
+async function docxToPdfBytes(file) {
+  const mammoth = await loadMammoth();
+  const { value } = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+  if (!value || !value.trim()) throw new Error("no readable text found in this .docx");
+  return await textToPdfBytes(value);
+}
+
+async function loadFiles(files, replacing) {
+  // Convert every input to PDF bytes first; a failure on one file toasts and is skipped
+  // rather than aborting the whole open.
+  const sources = [];
+  for (const file of files) {
+    try { sources.push({ name: file.name, bytes: await coerceToPdfBytes(file) }); }
+    catch (e) { toast(`Couldn't open ${file.name}: ${e?.message || "unsupported file"}`, "error"); }
+  }
+  if (!sources.length) return false;
+  if (replacing || !tk.pdfDoc) { tk.pdfDoc = await PDFDocument.create(); tk.order = []; tk.annos = []; tk.currentPage = 0; }
+  for (const s of sources) {
+    try {
+      const src = await PDFDocument.load(s.bytes, { ignoreEncryption: true });
+      const copied = await tk.pdfDoc.copyPages(src, src.getPageIndices());
+      for (const p of copied) { const idx = tk.pdfDoc.getPageCount(); tk.pdfDoc.addPage(p); tk.order.push(idx); }
+      if (replacing || !tk.fileName) tk.fileName = s.name;
+    } catch (e) { toast(`Couldn't load ${s.name}: ${e?.message || "bad PDF"}`, "error"); }
+  }
+  if (!tk.order.length) return false;
   $("emptyState").hidden = true;
   $("pageShell").hidden = false;
   $("pageNav").hidden = false;
@@ -122,6 +218,7 @@ async function loadFiles(files, replacing) {
   $("pageCountChip").hidden = false;
   invalidateRender();
   await fullRerender();
+  return true;
 }
 
 $("fileInput").onchange = async (e) => { const files = [...e.target.files]; if (files.length) await loadFiles(files, true); };
@@ -153,8 +250,9 @@ async function loadLaunchFiles(fileHandles) {
   for (const h of fileHandles) {
     try { files.push(await h.getFile()); } catch { /* permission or revoked handle */ }
   }
-  const pdfs = files.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
-  if (pdfs.length) { await loadFiles(pdfs, true); toast(`Opened ${pdfs[0].name}`, "success"); }
+  if (!files.length) { toast("Signet opened to handle a file but couldn't read it.", "error"); return; }
+  const ok = await loadFiles(files, true); // loadFiles toasts its own per-file problems
+  if (ok) toast(`Opened ${files[0].name}`, "success");
 }
 if ("launchQueue" in window && "setConsumer" in window.launchQueue) {
   window.launchQueue.setConsumer((params) => {
@@ -166,7 +264,7 @@ async function consumeSharedFile() {
   try {
     const cache = await caches.open("signet-share");
     const res = await cache.match("shared-pdf");
-    if (!res) return;
+    if (!res) { toast("Couldn't read the shared file — try opening it from Files instead.", "error"); return; }
     await cache.delete("shared-pdf");
     const blob = await res.blob();
     const name = res.headers.get("x-filename") || "shared.pdf";
