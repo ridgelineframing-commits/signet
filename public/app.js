@@ -435,6 +435,54 @@ $("togglePages").onclick = () => setPanelPref("thumbsCollapsed", !document.body.
 $("toggleProps").onclick = () => setPanelPref("propsCollapsed", !document.body.classList.contains("props-collapsed"));
 applyPanelPrefs();
 
+// ---------------------------------------------------------------- selection, undo/redo, clipboard, keys
+// Undo/redo tracks the annotation layer (placed elements). Baked-in operations that
+// rasterize or rewrite the page bytes — watermark, page numbers, redact "apply &
+// flatten", OCR flatten — are not part of the annotation stack and aren't undoable here.
+tk.selectedAnno = null;
+let undoStack = [], redoStack = [], clipAnno = null;
+function cloneAnno(a) { const o = {}; for (const k in a) { if (k[0] === "_") continue; o[k] = Array.isArray(a[k]) ? a[k].map((p) => ({ ...p })) : a[k]; } return o; }
+function annoSnapshot() { return tk.annos.map(cloneAnno); }
+function pushUndoState(state) { undoStack.push(state); if (undoStack.length > 80) undoStack.shift(); redoStack = []; }
+function pushUndo() { pushUndoState(annoSnapshot()); }
+function restoreAnnos(state) { tk.selectedAnno = null; tk.activeText = null; tk.annos = state.map(cloneAnno); if (hasDoc()) renderCurrentPage(); renderPropsPanel(); }
+function undo() { if (!undoStack.length) return toast("Nothing to undo"); redoStack.push(annoSnapshot()); restoreAnnos(undoStack.pop()); }
+function redo() { if (!redoStack.length) return toast("Nothing to redo"); undoStack.push(annoSnapshot()); restoreAnnos(redoStack.pop()); }
+function offsetAnno(a, dx, dy) {
+  if (a.kind === "ink") a.points = a.points.map((p) => ({ x: p.x + dx, y: p.y + dy }));
+  else if (a.kind === "shape") { a.x0 += dx; a.x1 += dx; a.y0 += dy; a.y1 += dy; }
+  else { a.x = (a.x || 0) + dx; a.y = (a.y || 0) + dy; }
+}
+function currentSelection() { return tk.selectedAnno || tk.activeText || null; }
+function deleteSelected() {
+  const a = currentSelection(); if (!a) return;
+  pushUndo(); tk.annos = tk.annos.filter((x) => x !== a);
+  tk.selectedAnno = null; if (tk.activeText === a) tk.activeText = null;
+  renderCurrentPage(); renderPropsPanel();
+}
+function copySelected() { const a = currentSelection(); if (!a) return; clipAnno = cloneAnno(a); toast("Copied — Ctrl/⌘+V to paste"); }
+function pasteClip() {
+  if (!clipAnno) return;
+  pushUndo();
+  const a = cloneAnno(clipAnno); a.page = tk.currentPage; offsetAnno(a, 0.025, 0.025);
+  delete a.origText; delete a.dirty; // a pasted edit-text becomes an independent element
+  tk.annos.push(a); tk.selectedAnno = a;
+  renderCurrentPage(); renderPropsPanel();
+}
+function duplicateSelected() { const a = currentSelection(); if (!a) return; clipAnno = cloneAnno(a); pasteClip(); }
+const inEditable = (t) => t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+window.addEventListener("keydown", (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+  const k = e.key.toLowerCase();
+  if (mod && k === "z") { if (inEditable(e.target)) return; e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && k === "y") { if (inEditable(e.target)) return; e.preventDefault(); redo(); return; }
+  if (mod && k === "c") { if (inEditable(e.target) || !currentSelection()) return; e.preventDefault(); copySelected(); return; }
+  if (mod && k === "v") { if (inEditable(e.target) || !clipAnno) return; e.preventDefault(); pasteClip(); return; }
+  if (mod && k === "d") { if (inEditable(e.target) || !currentSelection()) return; e.preventDefault(); duplicateSelected(); return; }
+  if ((e.key === "Delete" || e.key === "Backspace")) { if (inEditable(e.target) || !currentSelection()) return; e.preventDefault(); deleteSelected(); return; }
+  if (e.key === "Escape") { tk.selectedAnno = null; tk.placeArmed = false; if (hasDoc()) renderCurrentPage(); renderPropsPanel(); }
+});
+
 // ------------------------------------------------------------------ marker drawing + canvas interaction
 function drawMarker(box, a) {
   if (a.kind === "ink" || a.kind === "shape") return drawVectorMarker(box, a);
@@ -538,7 +586,7 @@ function resizeAnnoTo(a, nw, nh) {
 function addSelectionFrame(box, a, visualEl) {
   const bb = annoBBox(a);
   const f = document.createElement("div");
-  f.className = "selframe";
+  f.className = "selframe" + (a === tk.selectedAnno ? " sel" : "");
   f.style.left = bb.x * 100 + "%"; f.style.top = bb.y * 100 + "%"; f.style.width = bb.w * 100 + "%"; f.style.height = bb.h * 100 + "%";
   f.addEventListener("pointerdown", (e) => { if (e.target === f) startAnnoMove(box, a, f, visualEl, e); });
   if (isResizable(a)) {
@@ -550,27 +598,34 @@ function addSelectionFrame(box, a, visualEl) {
 }
 function startAnnoMove(box, a, frame, visualEl, e) {
   e.preventDefault(); e.stopPropagation();
+  tk.selectedAnno = a;
+  const pre = annoSnapshot();
   const rect = box.getBoundingClientRect(); const sx = e.clientX, sy = e.clientY; let moved = false;
   const move = (ev) => { moved = true; const t = `translate(${ev.clientX - sx}px,${ev.clientY - sy}px)`; frame.style.transform = t; if (visualEl) visualEl.style.transform = t; };
   const up = (ev) => {
     window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
-    if (moved) { moveAnnoBy(a, (ev.clientX - sx) / rect.width, (ev.clientY - sy) / rect.height); renderCurrentPage(); }
+    if (moved) { pushUndoState(pre); moveAnnoBy(a, (ev.clientX - sx) / rect.width, (ev.clientY - sy) / rect.height); }
+    renderCurrentPage(); renderPropsPanel();
   };
   window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
 }
 function startAnnoResize(box, a, frame, e) {
   e.preventDefault(); e.stopPropagation();
+  tk.selectedAnno = a;
+  const pre = annoSnapshot();
   const rect = box.getBoundingClientRect(); const bb = annoBBox(a); const sx = e.clientX, sy = e.clientY;
   const calc = (ev) => ({ nw: Math.max(0.01, bb.w + (ev.clientX - sx) / rect.width), nh: Math.max(0.01, bb.h + (ev.clientY - sy) / rect.height) });
   const move = (ev) => { const { nw, nh } = calc(ev); frame.style.width = nw * 100 + "%"; frame.style.height = nh * 100 + "%"; };
-  const up = (ev) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); const { nw, nh } = calc(ev); resizeAnnoTo(a, nw, nh); renderCurrentPage(); };
+  const up = (ev) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); pushUndoState(pre); const { nw, nh } = calc(ev); resizeAnnoTo(a, nw, nh); renderCurrentPage(); };
   window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
 }
 function startTextMove(box, a, el, e) {
   e.preventDefault(); e.stopPropagation();
+  tk.selectedAnno = a;
+  const pre = annoSnapshot();
   const rect = box.getBoundingClientRect(); const sx = e.clientX, sy = e.clientY; let moved = false;
   const move = (ev) => { moved = true; el.style.transform = `translate(${ev.clientX - sx}px,${ev.clientY - sy}px)`; };
-  const up = (ev) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); if (moved) { a.x += (ev.clientX - sx) / rect.width; a.y += (ev.clientY - sy) / rect.height; renderCurrentPage(); } };
+  const up = (ev) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); if (moved) { pushUndoState(pre); a.x += (ev.clientX - sx) / rect.width; a.y += (ev.clientY - sy) / rect.height; renderCurrentPage(); } };
   window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
 }
 function placeCaretEnd(el) {
@@ -690,7 +745,7 @@ async function ocrAllPages(statusEl) {
 function removeBtn(a) {
   const rm = document.createElement("button");
   rm.className = "x"; rm.textContent = "×";
-  rm.onclick = (ev) => { ev.stopPropagation(); tk.annos = tk.annos.filter((x) => x !== a); renderCurrentPage(); };
+  rm.onclick = (ev) => { ev.stopPropagation(); pushUndo(); tk.annos = tk.annos.filter((x) => x !== a); renderCurrentPage(); };
   return rm;
 }
 
@@ -812,6 +867,7 @@ function startBoxDrag(box, e) {
       const x = Math.min(dragState.x0, dragState.x1), y = Math.min(dragState.y0, dragState.y1);
       const w = Math.abs(dragState.x1 - dragState.x0), h = Math.abs(dragState.y1 - dragState.y0);
       if (w > 0.01 && h > 0.01) {
+        pushUndo();
         if (tk.tool === "redact") tk.annos.push({ kind: "redact", page: tk.currentPage, x, y, w, h });
         else tk.annos.push({ kind: "highlight", page: tk.currentPage, x, y, w, h, color: currentToolColor() });
         renderCurrentPage();
@@ -839,11 +895,16 @@ function startInk(box, e) {
   svg.appendChild(poly); box.appendChild(svg);
   const draw = () => poly.setAttribute("points", pts.map((p) => `${p.x * 100},${p.y * 100}`).join(" "));
   draw();
-  const move = (ev) => { pts.push(clampPt((ev.clientX - rect.left) / rect.width, (ev.clientY - rect.top) / rect.height)); dragState.dragged = true; draw(); };
+  const move = (ev) => {
+    const p = clampPt((ev.clientX - rect.left) / rect.width, (ev.clientY - rect.top) / rect.height);
+    if (ev.shiftKey) { pts.length = 1; pts.push(p); } // hold Shift → straight line from the start point
+    else pts.push(p);
+    dragState.dragged = true; draw();
+  };
   const up = () => {
     window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
     svg.remove();
-    if (pts.length > 1) { tk.annos.push({ kind: "ink", page: tk.currentPage, points: pts, color: tk.ink.color, width: tk.ink.width }); renderCurrentPage(); }
+    if (pts.length > 1) { pushUndo(); tk.annos.push({ kind: "ink", page: tk.currentPage, points: pts, color: tk.ink.color, width: tk.ink.width }); renderCurrentPage(); }
     setTimeout(() => (dragState = null), 0);
   };
   window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
@@ -866,7 +927,7 @@ function startShape(box, e) {
       // Normalize rect/ellipse to top-left → bottom-right so the resize handle behaves; keep
       // line/arrow endpoints as drawn (direction matters).
       if (tk.shape.type === "rect" || tk.shape.type === "ellipse") { [X0, X1] = [Math.min(X0, X1), Math.max(X0, X1)]; [Y0, Y1] = [Math.min(Y0, Y1), Math.max(Y0, Y1)]; }
-      tk.annos.push({ kind: "shape", type: tk.shape.type, page: tk.currentPage, x0: X0, y0: Y0, x1: X1, y1: Y1, color: tk.shape.color, fill: tk.shape.fill, width: tk.shape.width });
+      pushUndo(); tk.annos.push({ kind: "shape", type: tk.shape.type, page: tk.currentPage, x0: X0, y0: Y0, x1: X1, y1: Y1, color: tk.shape.color, fill: tk.shape.fill, width: tk.shape.width });
       renderCurrentPage();
     }
     setTimeout(() => (dragState = null), 0);
@@ -877,13 +938,14 @@ function placeImage(box, x, y) {
   if (!tk.pendingImage) return;
   const rect = box.getBoundingClientRect();
   const w = 0.28, h = (w * rect.width / tk.pendingImage.ar) / rect.height;
-  tk.annos.push({ kind: "image", page: tk.currentPage, x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), w, h, dataUrl: tk.pendingImage.dataUrl });
+  pushUndo(); tk.annos.push({ kind: "image", page: tk.currentPage, x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), w, h, dataUrl: tk.pendingImage.dataUrl });
   renderCurrentPage();
 }
 
 async function placeText(x, y) {
   const t = tk.pendingText;
   const a = { kind: "text", page: tk.currentPage, x, y, text: "", size: t.size, color: t.color, bold: t.bold, italic: t.italic, underline: t.underline, align: t.align };
+  pushUndo();
   tk.annos.push(a);
   tk.activeText = a;
   await renderCurrentPage();
@@ -894,7 +956,7 @@ function placeSig(x, y) {
   if (!tk.pendingSig) return;
   const isInit = tk.pendingSig.kind === "initials";
   const w = isInit ? 0.09 : 0.24, h = isInit ? 0.05 : 0.09;
-  tk.annos.push({ kind: tk.pendingSig.kind, page: tk.currentPage, x, y, w, h, dataUrl: tk.pendingSig.dataUrl });
+  pushUndo(); tk.annos.push({ kind: tk.pendingSig.kind, page: tk.currentPage, x, y, w, h, dataUrl: tk.pendingSig.dataUrl });
   renderCurrentPage();
 }
 
@@ -909,7 +971,7 @@ function renderPropsPanel() {
   const builders = { select: buildSelectPanel, hand: buildHandPanel, text: buildTextPanel, edittext: buildEditTextPanel, signature: buildSigPanel, draw: buildDrawPanel, shape: buildShapePanel, highlight: buildHighlightPanel, image: buildImagePanel, redact: buildRedactPanel, watermark: buildWatermarkPanel, pagenum: buildPagenumPanel, organize: buildOrganizePanel };
   (builders[tk.tool] || buildSelectPanel)(body);
 }
-function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Drag any placed element to move it.<br>Drag the corner handle to resize. Double-click text to edit it. Use × to delete.</div>'; }
+function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Click an element to select it, then drag to move or drag the corner to resize. Double-click text to edit it.<br><br><strong>Keyboard:</strong> Ctrl/⌘+Z undo · Ctrl/⌘+Y redo · Ctrl/⌘+C copy · Ctrl/⌘+V paste · Ctrl/⌘+D duplicate · Delete removes · Esc deselects.</div>'; }
 function buildHandPanel(body) { body.innerHTML = '<p class="hint">Drag anywhere on the page to pan around. Handy when zoomed in. This tool never changes the document.</p>'; }
 
 function buildEditTextPanel(body) {
@@ -941,7 +1003,7 @@ function buildDrawPanel(body) {
     </div>
     <div class="label" style="margin-top:6px">Thickness <span style="color:var(--sub2);font-weight:500">${tk.ink.width}px</span></div>
     <input type="range" id="inkWidth" min="1" max="10" value="${tk.ink.width}" style="width:100%" />
-    <p class="hint" style="margin-top:12px">Drag on the page to draw. Each stroke can be removed with its ×.</p>`;
+    <p class="hint" style="margin-top:12px">Drag on the page to draw. <strong>Hold Shift for a straight line.</strong> Each stroke can be removed with its ×.</p>`;
   document.querySelectorAll('#propsBody .sw').forEach((b) => (b.onclick = () => { tk.ink.color = b.dataset.c; renderPropsPanel(); }));
   $("inkCustom").oninput = (e) => (tk.ink.color = e.target.value);
   $("inkWidth").oninput = (e) => { tk.ink.width = Number(e.target.value); renderPropsPanel(); };
@@ -965,7 +1027,7 @@ function buildShapePanel(body) {
     <div class="label" style="margin-top:6px">Thickness <span style="color:var(--sub2);font-weight:500">${tk.shape.width}px</span></div>
     <input type="range" id="shWidth" min="1" max="8" value="${tk.shape.width}" style="width:100%;margin-bottom:12px" />
     <label class="row" style="gap:8px${["line", "arrow"].includes(tk.shape.type) ? ";opacity:.4;pointer-events:none" : ""}"><input type="checkbox" id="shFill" ${tk.shape.fill ? "checked" : ""} /> <span class="hint" style="margin:0">Fill (rectangle / ellipse)</span></label>
-    <p class="hint" style="margin-top:12px">Drag on the page to draw the shape.</p>`;
+    <p class="hint" style="margin-top:12px">Drag on the page to draw the shape. Switch to Select, then Ctrl/⌘+C and Ctrl/⌘+V (or Ctrl/⌘+D) to stamp copies of it.</p>`;
   document.querySelectorAll('#propsBody [data-st]').forEach((b) => (b.onclick = () => { tk.shape.type = b.dataset.st; renderPropsPanel(); }));
   document.querySelectorAll('#propsBody .sw').forEach((b) => (b.onclick = () => { tk.shape.color = b.dataset.c; renderPropsPanel(); }));
   $("shColor").oninput = (e) => (tk.shape.color = e.target.value);
