@@ -21,8 +21,8 @@
     "path": "./signet-release.keystore",
     "alias": "signet"
   },
-  "appVersionName": "1.0.0",
-  "appVersionCode": 1,
+  "appVersionName": "1.0.1",
+  "appVersionCode": 2,
   "shellApp": false,
   "webManifestUrl": "https://signet.ridgeline.workers.dev/manifest.webmanifest",
   "fallbackType": "customtabs",
@@ -37,6 +37,18 @@
     {
       "actionUrl": "https://signet.ridgeline.workers.dev/",
       "mimeTypes": ["application/pdf"]
+    },
+    {
+      "actionUrl": "https://signet.ridgeline.workers.dev/",
+      "mimeTypes": ["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"]
+    },
+    {
+      "actionUrl": "https://signet.ridgeline.workers.dev/",
+      "mimeTypes": ["text/plain", "text/csv"]
+    },
+    {
+      "actionUrl": "https://signet.ridgeline.workers.dev/",
+      "mimeTypes": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     }
   ],
   "shareTarget": {
@@ -44,7 +56,7 @@
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
-      "files": [{ "name": "file", "accept": ["application/pdf", ".pdf"] }]
+      "files": [{ "name": "file", "accept": ["application/pdf", "image/jpeg", "image/png", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] }]
     }
   },
   "protocolHandlers": [],

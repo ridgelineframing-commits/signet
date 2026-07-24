@@ -1,0 +1,7 @@
+# Never let the CDN edge-cache the downloadable APK. Without this, Cloudflare
+# pins the first-served bytes at the edge and keeps handing them out even after
+# a new APK is deployed — so a rebuilt app appears "not updated" at the public
+# URL until the cache is manually purged. no-store forces every request to hit
+# the current asset.
+/download/*
+  Cache-Control: no-store

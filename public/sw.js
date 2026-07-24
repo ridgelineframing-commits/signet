@@ -27,7 +27,7 @@ async function handleShare(request) {
       const cache = await caches.open("signet-share");
       await cache.put(
         "shared-pdf",
-        new Response(file, { headers: { "content-type": "application/pdf", "x-filename": file.name || "shared.pdf" } })
+        new Response(file, { headers: { "content-type": file.type || "application/octet-stream", "x-filename": file.name || "shared" } })
       );
     }
   } catch (e) {
