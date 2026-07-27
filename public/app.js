@@ -198,10 +198,24 @@ async function loadFiles(files, replacing) {
   if (!sources.length) return false;
   if (replacing || !tk.pdfDoc) { tk.pdfDoc = await PDFDocument.create(); tk.order = []; tk.annos = []; tk.currentPage = 0; }
   for (const s of sources) {
+    const startLen = tk.order.length;
     try {
-      const src = await PDFDocument.load(s.bytes, { ignoreEncryption: true });
-      const copied = await tk.pdfDoc.copyPages(src, src.getPageIndices());
-      for (const p of copied) { const idx = tk.pdfDoc.getPageCount(); tk.pdfDoc.addPage(p); tk.order.push(idx); }
+      try {
+        const src = await PDFDocument.load(s.bytes, { ignoreEncryption: true });
+        const copied = await tk.pdfDoc.copyPages(src, src.getPageIndices());
+        for (const p of copied) { const idx = tk.pdfDoc.getPageCount(); tk.pdfDoc.addPage(p); tk.order.push(idx); }
+      } catch (primaryErr) {
+        // pdf-lib rejects some malformed / incrementally-updated PDFs that pdf.js (and
+        // Acrobat) open fine — the error surfaces during page-tree traversal, not at parse,
+        // so load options don't help. Fall back to rendering the pages via pdf.js into a
+        // fresh, clean pdf-lib doc (rasterized: no selectable text, but it opens).
+        tk.order.length = startLen; // drop any partial pages before retrying
+        const rb = await rasterizePdf(s.bytes);
+        const rsrc = await PDFDocument.load(rb);
+        const copied = await tk.pdfDoc.copyPages(rsrc, rsrc.getPageIndices());
+        for (const p of copied) { const idx = tk.pdfDoc.getPageCount(); tk.pdfDoc.addPage(p); tk.order.push(idx); }
+        toast(`Opened ${s.name} in compatibility mode — pages are images (text isn't selectable). Use Edit text to make it editable.`, "info");
+      }
       if (replacing || !tk.fileName) tk.fileName = s.name;
     } catch (e) { toast(`Couldn't load ${s.name}: ${e?.message || "bad PDF"}`, "error"); }
   }
@@ -383,26 +397,71 @@ function updatePageNav() {
   if (!hasDoc()) return;
   $("pnLabel").textContent = (tk.currentPage + 1) + " / " + tk.order.length;
   $("pnZoomReset").textContent = tk.zoom + "%";
+  { const h = $("hdrZoomLabel"); if (h) h.textContent = tk.zoom + "%"; }
   $("pageCountChip").textContent = tk.order.length + (tk.order.length === 1 ? " page" : " pages");
 }
 $("pnPrev").onclick = () => { if (tk.currentPage > 0) { tk.currentPage--; fullRerenderLight(); } };
 $("pnNext").onclick = () => { if (tk.currentPage < tk.order.length - 1) { tk.currentPage++; fullRerenderLight(); } };
-$("pnZoomOut").onclick = () => { tk.zoom = Math.max(30, tk.zoom - 10); applyZoom(); };
-$("pnZoomIn").onclick = () => { tk.zoom = Math.min(400, tk.zoom + 10); applyZoom(); };
-$("pnZoomReset").onclick = () => { tk.zoom = 100; applyZoom(); };
-function applyZoom() { $("pageShell").style.transform = "scale(" + (tk.zoom / 100) + ")"; $("pnZoomReset").textContent = tk.zoom + "%"; }
+$("pnZoomOut").onclick = () => setZoom(tk.zoom - 10);
+$("pnZoomIn").onclick = () => setZoom(tk.zoom + 10);
+$("pnZoomReset").onclick = () => setZoom(100);
+function setZoom(z) { tk.zoom = Math.max(30, Math.min(400, Math.round(z))); applyZoom(); }
+function zoomFit() {
+  if (!hasDoc()) return;
+  const scroll = $("canvasScroll"), shell = $("pageShell");
+  const natW = shell.getBoundingClientRect().width / (tk.zoom / 100);
+  if (natW > 0) setZoom(Math.floor((scroll.clientWidth - 48) / natW * 100));
+}
+function applyZoom() {
+  $("pageShell").style.transform = "scale(" + (tk.zoom / 100) + ")";
+  const z = tk.zoom + "%";
+  $("pnZoomReset").textContent = z;
+  const h = $("hdrZoomLabel"); if (h) h.textContent = z;
+}
 
-// ------------------------------------------------------------------ tool rail
-document.querySelectorAll("#toolRail [data-tool]").forEach((b) => {
-  b.onclick = () => {
-    tk.tool = b.dataset.tool;
-    tk.placeArmed = false;
-    tk.activeText = null;
-    document.querySelectorAll("#toolRail [data-tool]").forEach((x) => x.classList.toggle("active", x === b));
-    if (hasDoc()) renderCurrentPage(); // text boxes are editable only under Text/Select
-    renderPropsPanel();
-    if (isMobile()) openPropsSheet(); // reveal the properties bottom-sheet on mobile
-  };
+// ------------------------------------------------------------------ tool selection (mobile rail + header menus)
+function selectTool(name) {
+  tk.tool = name;
+  tk.placeArmed = false;
+  tk.activeText = null;
+  document.querySelectorAll("#toolRail [data-tool], #menuBar [data-tool]").forEach((x) => x.classList.toggle("active", x.dataset.tool === name));
+  // Signature needs drawing room — on wide screens show it as a centered popup, not the ribbon strip.
+  const sigPopup = name === "signature" && !isMobile();
+  document.body.classList.toggle("ribbon-popup", sigPopup);
+  $("ribbonScrim").hidden = !sigPopup;
+  if (hasDoc()) renderCurrentPage(); // text boxes are editable only under Text/Select
+  renderPropsPanel();
+  if (isMobile()) openPropsSheet(); // reveal the properties bottom-sheet on mobile
+}
+document.querySelectorAll("#toolRail [data-tool]").forEach((b) => { b.onclick = () => selectTool(b.dataset.tool); });
+$("ribbonScrim").onclick = () => selectTool("select");
+
+// ---- Word-style header menu bar: dropdowns set the tool or run an action ----
+function closeMenus() { document.querySelectorAll("#menuBar .menu.open").forEach((m) => m.classList.remove("open")); }
+document.querySelectorAll("#menuBar .menu > .menutop").forEach((btn) => {
+  const menu = btn.parentElement;
+  btn.onclick = (e) => { e.stopPropagation(); const wasOpen = menu.classList.contains("open"); closeMenus(); if (!wasOpen) menu.classList.add("open"); };
+  btn.onmouseenter = () => { if (document.querySelector("#menuBar .menu.open") && !menu.classList.contains("open")) { closeMenus(); menu.classList.add("open"); } };
+});
+document.addEventListener("click", closeMenus);
+function runMenuAct(act) {
+  ({
+    open: () => $("fileInput").click(),
+    addpages: () => $("addPagesInput").click(),
+    download: () => $("downloadBtn").click(),
+    send: () => $("requestSigBtn").click(),
+    requests: () => $("openEnvelopesBtn").click(),
+    undo, redo, copy: copySelected, paste: pasteClip, duplicate: duplicateSelected, delete: deleteSelected,
+    zoomin: () => setZoom(tk.zoom + 10), zoomout: () => setZoom(tk.zoom - 10), zoomreset: () => setZoom(100), zoomfit: zoomFit,
+    togglePages: () => $("togglePages").click(),
+  }[act] || (() => {}))();
+}
+document.querySelectorAll("#menuBar [data-tool], #menuBar [data-act]").forEach((el) => {
+  el.addEventListener("click", (e) => {
+    e.stopPropagation(); closeMenus();
+    if (el.dataset.tool) selectTool(el.dataset.tool);
+    else runMenuAct(el.dataset.act);
+  });
 });
 
 // ------------------------------------------------------------------ mobile layout
@@ -1612,7 +1671,8 @@ $("envNext").onclick = async () => {
     nextBtn.disabled = true; nextBtn.textContent = "Loading…";
     ev.fields = [];
     const bytes = new Uint8Array(await file.arrayBuffer());
-    ev.pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+    try { ev.pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true }); }
+    catch { ev.pdfDoc = await PDFDocument.load(await rasterizePdf(bytes)); } // same pdf.js fallback as the editor
 
     const chips = $("recipientChips"); chips.innerHTML = "";
     recipients.forEach((r, i) => {
