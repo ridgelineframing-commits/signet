@@ -169,6 +169,53 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 .sigsaved .sigthumb img{max-height:38px;max-width:132px;display:block;pointer-events:none;}
 .sigsaved .sigthumb .x{top:-7px;right:-7px;}
 
+/* ---- Word-style menu bar + contextual ribbon (wide screens) ---- */
+.menubar{display:flex;align-items:center;gap:2px;height:40px;flex:0 0 40px;padding:0 10px;background:#fff;border-bottom:1px solid var(--line);z-index:19;}
+.menubar .menu{position:relative;}
+.menubar .menutop{border:none;background:transparent;color:var(--ink2);font-size:13px;font-weight:600;padding:6px 11px;border-radius:7px;}
+.menubar .menutop:hover,.menubar .menu.open .menutop{background:var(--chip);}
+.menubar .menupop{display:none;position:absolute;top:calc(100% + 3px);left:0;min-width:216px;background:#fff;border:1px solid var(--line2);border-radius:10px;box-shadow:0 14px 36px rgba(20,22,30,.18);padding:6px;z-index:40;}
+.menubar .menu.open .menupop{display:block;}
+.menubar .mi{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;text-align:left;border:none;background:transparent;color:var(--ink2);font-size:13px;font-weight:500;padding:8px 10px;border-radius:7px;white-space:nowrap;}
+.menubar .mi:hover{background:var(--chip);}
+.menubar .mi.active{color:var(--accent);font-weight:700;}
+.menubar .mi .kbd{font-size:11px;color:var(--sub3);font-weight:600;}
+.menubar .misep{height:1px;background:#eeeef1;margin:5px 6px;}
+.menubar .zoomgroup{display:flex;align-items:center;gap:2px;border:1px solid var(--line2);border-radius:8px;padding:2px;margin:0 6px;}
+.menubar .zbtn{width:28px;height:28px;border:none;background:transparent;border-radius:6px;color:var(--ink2);font-size:16px;display:flex;align-items:center;justify-content:center;}
+.menubar .zbtn:hover{background:var(--chip);}
+.menubar .zlabel2{min-width:54px;height:28px;border:none;background:transparent;border-radius:6px;font-size:12.5px;font-weight:700;color:var(--ink2);}
+.menubar .zlabel2:hover{background:var(--chip);}
+.menubar .quicktool{border:1px solid var(--line2);background:#fff;color:var(--ink2);font-size:12.5px;font-weight:600;padding:0 12px;height:30px;border-radius:7px;}
+.menubar .quicktool:hover{background:var(--chip);}
+.menubar .quicktool.active{background:var(--grad);color:#fff;border-color:transparent;box-shadow:0 1px 4px rgba(106,76,240,.3);}
+#ribbonScrim{z-index:54;}
+
+@media (min-width:821px){
+  nav.rail{display:none;}                       /* tools now live in the header menus */
+  aside.props{flex:0 0 auto;max-height:230px;overflow:auto;border-left:none;border-bottom:1px solid var(--line);background:#fbfbfc;}
+  aside.props .props-head{display:none;}
+  aside.props .props-body{display:flex;flex-flow:row wrap;align-items:center;gap:8px 14px;padding:9px 16px;}
+  aside.props .props-body>*{margin:0 !important;}
+  aside.props .props-body .label{margin:0 2px 0 0 !important;}
+  aside.props .props-body .swrow{margin:0;gap:7px;}
+  aside.props .props-body .tabbtns{width:auto;gap:6px;margin:0;}
+  aside.props .props-body .tabbtns button{padding:6px 14px;flex:0 0 auto;}
+  aside.props .props-body input[type=range]{width:120px;vertical-align:middle;}
+  aside.props .props-body .btn{width:auto !important;height:32px;}
+  aside.props .props-body .props-empty{border:none;background:none;padding:2px 0;text-align:left;color:var(--sub2);}
+  aside.props .props-body>.row{width:auto;}
+  aside.props .props-body>.hint,aside.props .props-body>p.hint{flex-basis:100%;margin:0;}
+  /* signature tool → centered popup instead of the horizontal ribbon */
+  body.ribbon-popup aside.props{position:fixed;left:50%;top:72px;transform:translateX(-50%);width:min(380px,92vw);max-height:76vh;overflow:auto;
+    border:1px solid var(--line2);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.32);z-index:55;background:#fff;}
+  body.ribbon-popup aside.props .props-head{display:block;padding:15px 18px 4px;}
+  body.ribbon-popup aside.props .props-head .sheet-close{display:none;}
+  body.ribbon-popup aside.props .props-body{flex-direction:column;align-items:stretch;padding:12px 18px 18px;gap:0;}
+  body.ribbon-popup aside.props .props-body>*{margin:revert !important;}
+  body.ribbon-popup aside.props .props-body .btn{width:100% !important;}
+}
+
 /* ---- Mobile / narrow screens ---- */
 @media (max-width:820px){
   .desktop-only{display:none !important;}
@@ -269,6 +316,76 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <button class="btn primary" id="requestSigBtn" disabled><span class="desktop-only">Send for signature</span><span class="mobile-only">Send</span></button>
   </header>
 
+  <!-- Word-style menu bar (wide screens only; phones/tablets keep the bottom tool bar) -->
+  <div class="menubar desktop-only" id="menuBar">
+    <div class="menu" data-menu="file"><button class="menutop">File</button><div class="menupop">
+      <button class="mi" data-act="open">Open…</button>
+      <button class="mi" data-act="addpages">Add pages…</button>
+      <div class="misep"></div>
+      <button class="mi" data-act="download">Download</button>
+      <button class="mi" data-act="send">Send for signature</button>
+      <button class="mi" data-act="requests">Signature requests</button>
+    </div></div>
+    <div class="menu" data-menu="edit"><button class="menutop">Edit</button><div class="menupop">
+      <button class="mi" data-act="undo">Undo <span class="kbd">Ctrl+Z</span></button>
+      <button class="mi" data-act="redo">Redo <span class="kbd">Ctrl+Y</span></button>
+      <div class="misep"></div>
+      <button class="mi" data-act="copy">Copy <span class="kbd">Ctrl+C</span></button>
+      <button class="mi" data-act="paste">Paste <span class="kbd">Ctrl+V</span></button>
+      <button class="mi" data-act="duplicate">Duplicate <span class="kbd">Ctrl+D</span></button>
+      <button class="mi" data-act="delete">Delete <span class="kbd">Del</span></button>
+    </div></div>
+    <div class="menu" data-menu="insert"><button class="menutop">Insert</button><div class="menupop">
+      <button class="mi" data-tool="text">Text</button>
+      <button class="mi" data-tool="signature">Signature / initials</button>
+      <button class="mi" data-tool="image">Image</button>
+      <button class="mi" data-tool="shape">Shapes</button>
+      <button class="mi" data-tool="pagenum">Page numbers</button>
+    </div></div>
+    <div class="menu" data-menu="tools"><button class="menutop">Tools</button><div class="menupop">
+      <button class="mi" data-tool="select">Select</button>
+      <button class="mi" data-tool="hand">Pan / hand</button>
+      <button class="mi" data-tool="draw">Draw</button>
+      <button class="mi" data-tool="highlight">Highlight</button>
+      <button class="mi" data-tool="edittext">Edit text (OCR)</button>
+      <button class="mi" data-tool="redact">Redact</button>
+      <button class="mi" data-tool="watermark">Watermark</button>
+    </div></div>
+    <div class="menu" data-menu="pages"><button class="menutop">Pages</button><div class="menupop">
+      <button class="mi" data-tool="organize">Organize pages…</button>
+      <div class="misep"></div>
+      <button class="mi" data-act="togglePages">Show / hide Pages panel</button>
+    </div></div>
+    <div class="menu" data-menu="view"><button class="menutop">View</button><div class="menupop">
+      <button class="mi" data-act="zoomin">Zoom in</button>
+      <button class="mi" data-act="zoomout">Zoom out</button>
+      <button class="mi" data-act="zoomreset">Reset zoom (100%)</button>
+      <button class="mi" data-act="zoomfit">Fit width</button>
+      <div class="misep"></div>
+      <button class="mi" data-act="togglePages">Show / hide Pages panel</button>
+    </div></div>
+
+    <div class="spacer"></div>
+
+    <div class="zoomgroup" title="Zoom">
+      <button class="zbtn" data-act="zoomout" title="Zoom out">&#8722;</button>
+      <button class="zlabel2" data-act="zoomreset" id="hdrZoomLabel" title="Reset zoom">100%</button>
+      <button class="zbtn" data-act="zoomin" title="Zoom in">&#43;</button>
+    </div>
+    <button class="quicktool active" data-tool="select" title="Select">Select</button>
+    <button class="quicktool" data-tool="hand" title="Pan">Pan</button>
+  </div>
+
+  <!-- Contextual ribbon: the active tool's options (relocated from the old right panel). -->
+  <div class="scrim" id="ribbonScrim" hidden></div>
+  <aside class="props" id="propsPanel" hidden>
+    <div class="props-head">
+      <button class="sheet-close mobile-only" id="propsClose" title="Close">&#9662;</button>
+      <div class="t" id="propsTitle">Select</div><div class="h" id="propsHint">Click any element on the page to select it.</div>
+    </div>
+    <div class="props-body" id="propsBody"></div>
+  </aside>
+
   <div class="body-flex">
     <nav class="rail" id="toolRail">
       <button class="railbtn active" data-tool="select" title="Select">
@@ -330,14 +447,6 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
         <button id="pnZoomIn" title="Zoom in">&#43;</button>
       </div>
     </div>
-
-    <aside class="props" id="propsPanel" hidden>
-      <div class="props-head">
-        <button class="sheet-close mobile-only" id="propsClose" title="Close">&#9662;</button>
-        <div class="t" id="propsTitle">Select</div><div class="h" id="propsHint">Click any element on the page to select it.</div>
-      </div>
-      <div class="props-body" id="propsBody"></div>
-    </aside>
   </div>
 </div>
 
