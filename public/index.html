@@ -70,6 +70,11 @@ nav.rail .railbtn:hover{background:var(--chip);}
 nav.rail .railbtn.active{background:var(--grad);color:#fff;box-shadow:0 2px 9px rgba(106,76,240,.34);}
 nav.rail .railbtn svg{width:22px;height:22px;display:block;}
 nav.rail .raildiv{width:28px;height:1px;background:#eeeef1;margin:5px 0;}
+nav.rail .railbtn{position:relative;}
+nav.rail .railbtn::after{content:attr(data-label);position:fixed;left:66px;z-index:80;pointer-events:none;opacity:0;
+  padding:6px 9px;border-radius:7px;background:var(--ink);color:#fff;font-size:11.5px;font-weight:600;white-space:nowrap;
+  transform:translateX(-4px);transition:opacity .12s,transform .12s;box-shadow:0 4px 14px rgba(20,22,30,.2);}
+nav.rail .railbtn:hover::after,nav.rail .railbtn:focus-visible::after{opacity:1;transform:translateX(0);}
 
 aside.thumbs{flex:0 0 172px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:14px 0 20px;}
 aside.thumbs .thead{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--sub3);padding:0 16px 10px;}
@@ -92,6 +97,13 @@ aside.thumbs .thead{font-size:11px;font-weight:700;letter-spacing:.06em;text-tra
 .empty-state:hover,.empty-state.dragover{border-color:var(--accent);background:#f6f5ff;}
 .empty-state h2{font-size:17px;margin:14px 0 6px;}
 .empty-state p{color:var(--sub2);font-size:13px;margin:0 0 18px;}
+.empty-state .open-file{height:40px;padding:0 18px;justify-content:center;}
+.empty-state .format-pills{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:14px;}
+.empty-state .format-pills span{font-size:10.5px;font-weight:700;color:var(--sub2);background:var(--chip);border-radius:99px;padding:4px 8px;}
+.empty-state .privacy-note{display:block;margin-top:12px;font-size:11px;color:var(--sub3);}
+.color-control{display:flex;align-items:center;gap:7px;}
+.color-control input[type=color]{width:40px;height:38px;padding:3px;border:1px solid var(--line2);border-radius:8px;background:#fff;}
+.color-control input[type=text]{min-width:86px;width:86px;text-transform:uppercase;font-variant-numeric:tabular-nums;}
 
 .pagenav{position:absolute;left:50%;transform:translateX(-50%);bottom:20px;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 4px 18px rgba(20,22,30,.12);padding:6px;z-index:12;}
 .pagenav button{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--sub);border-radius:7px;}
@@ -216,7 +228,6 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 .tabbar .tabadd:hover{background:rgba(20,22,30,.08);color:var(--ink);}
 
 @media (min-width:821px){
-  nav.rail{display:none;}                       /* tools now live in the header menus */
   aside.props{flex:0 0 auto;max-height:230px;overflow:auto;border-left:none;border-bottom:1px solid var(--line);background:#fbfbfc;}
   aside.props .props-head{display:none;}
   aside.props .props-body{display:flex;flex-flow:row wrap;align-items:center;gap:8px 14px;padding:9px 16px;}
@@ -308,7 +319,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 <body>
 
 <div id="loginScreen" hidden>
-  <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><linearGradient id="plg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient><text x="6" y="86" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="currentColor">PD</text><g transform="translate(196 28) rotate(13)"><text x="0" y="60" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="url(#plg2)">F</text></g><g transform="translate(236 12) rotate(13) scale(.82)" fill="currentColor"><path d="M6 20 a20 20 0 0 1 40 0 v18 a10 10 0 0 1 -10 10 h-24 a12 12 0 0 1 -12 -12 z"/><path d="M6 26 q-12 2 -12 14 q0 8 9 9" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></g></svg>
+  <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="plg2" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#8A68FF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg2)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg>
   <div class="box">
     <button id="loginCancel" title="Close" aria-label="Close">&times;</button>
     <h1>Signet<span style="color:var(--accent)">.</span></h1>
@@ -323,7 +334,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   <header class="topbar">
     <button class="icon-btn mobile-only" id="pagesToggle" title="Pages" hidden>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg></button>
-    <div class="brand"><svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Signet"><linearGradient id="plg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient><text x="6" y="86" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="currentColor">PD</text><g transform="translate(196 28) rotate(13)"><text x="0" y="60" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="url(#plg)">F</text></g><g transform="translate(236 12) rotate(13) scale(.82)" fill="currentColor"><path d="M6 20 a20 20 0 0 1 40 0 v18 a10 10 0 0 1 -10 10 h-24 a12 12 0 0 1 -12 -12 z"/><path d="M6 26 q-12 2 -12 14 q0 8 9 9" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></g></svg><span class="desktop-only" style="font-size:19px;font-weight:700;letter-spacing:-.01em">Signet<span style="color:var(--accent)">.</span></span></div>
+    <div class="brand"><svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="PDF editor"><defs><linearGradient id="plg" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#8A68FF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg><span class="desktop-only" style="font-size:19px;font-weight:700;letter-spacing:-.01em">Signet<span style="color:var(--accent)">.</span></span></div>
     <div class="vdiv desktop-only"></div>
     <div class="row desktop-only" style="min-width:0">
       <span class="doctitle" id="docTitleLbl">No document loaded</span>
@@ -391,7 +402,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     </div></div>
     <div class="menu" data-menu="help"><button class="menutop">Help</button><div class="menupop">
       <button class="mi" data-act="shortcuts">Keyboard shortcuts</button>
-      <button class="mi" data-act="tutorial">Tutorial <span class="kbd">soon</span></button>
+      <button class="mi" data-act="tutorial">Quick start</button>
     </div></div>
 
     <div class="spacer"></div>
@@ -419,7 +430,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   </aside>
 
   <div class="body-flex">
-    <nav class="rail" id="toolRail">
+    <nav class="rail" id="toolRail" role="toolbar" aria-label="PDF editing tools">
       <button class="railbtn active" data-tool="select" title="Select">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l14 6-6 2-2 6z"/></svg></button>
       <button class="railbtn" data-tool="hand" title="Hand — pan around">
@@ -462,10 +473,13 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <div class="canvaswrap">
       <div class="canvasscroll" id="canvasScroll">
         <div class="empty-state" id="emptyState">
-          <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><linearGradient id="plg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient><text x="6" y="86" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="currentColor">PD</text><g transform="translate(196 28) rotate(13)"><text x="0" y="60" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="url(#plg3)">F</text></g><g transform="translate(236 12) rotate(13) scale(.82)" fill="currentColor"><path d="M6 20 a20 20 0 0 1 40 0 v18 a10 10 0 0 1 -10 10 h-24 a12 12 0 0 1 -12 -12 z"/><path d="M6 26 q-12 2 -12 14 q0 8 9 9" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></g></svg>
-          <h2>Drop a PDF, image, or Word file here</h2>
-          <p>...or click to browse. PDFs, JPG/PNG images, .txt and .docx all open here — pick several to merge them in order.</p>
-          <input type="file" id="fileInput" accept=".pdf,application/pdf,image/*,.txt,.md,.csv,text/plain,.docx" multiple />
+          <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="plg3" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#8A68FF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg3)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg>
+          <h2>Open a document and start editing</h2>
+          <p>Drop files here, or choose them below. Select several files to combine them in order.</p>
+          <label class="btn primary open-file" for="fileInput">Choose files</label>
+          <input type="file" id="fileInput" accept=".pdf,application/pdf,image/*,.txt,.md,.csv,text/plain,.docx" multiple hidden />
+          <div class="format-pills" aria-label="Supported formats"><span>PDF</span><span>JPG / PNG</span><span>DOCX</span><span>TXT / MD / CSV</span></div>
+          <small class="privacy-note">Editing happens in your browser until you choose to send or download.</small>
         </div>
         <div class="pageshell" id="pageShell" hidden></div>
       </div>
@@ -543,7 +557,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
         <strong>Esc</strong> &mdash; Deselect<br>
         <strong>Shift</strong> while drawing &mdash; Straight line
       </div>
-      <p class="hint" style="margin-top:14px;color:var(--sub3)">Pick the Select tool, click an element, then use these. An interactive tutorial is coming soon.</p>
+      <p class="hint" style="margin-top:14px;color:var(--sub3)">Quick start: open a file, choose a tool from the left rail, edit directly on the page, then use File &rarr; Download.</p>
     </div>
   </div>
 </div>

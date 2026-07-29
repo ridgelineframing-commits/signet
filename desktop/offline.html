@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'">
+  <title>Signet is offline</title>
+  <style>
+    :root{font-family:Segoe UI,system-ui,sans-serif;color:#24262c;background:#ecebef}
+    body{min-height:100vh;margin:0;display:grid;place-items:center}
+    main{width:min(420px,calc(100vw - 48px));padding:42px;text-align:center;background:#fff;border:1px solid #e2e3e8;border-radius:18px;box-shadow:0 18px 50px rgba(20,22,30,.14)}
+    img{width:88px;height:88px} h1{margin:18px 0 8px;font-size:24px} p{margin:0 0 22px;color:#6d727b;line-height:1.5}
+    button{border:0;border-radius:9px;padding:11px 20px;color:#fff;font:600 14px inherit;background:linear-gradient(135deg,#6a4cf0,#4f86ff);cursor:pointer}
+  </style>
+</head>
+<body>
+  <main>
+    <img src="icon.ico" alt="">
+    <h1>Signet can’t connect</h1>
+    <p>Check your internet connection, then try opening the PDF editor again.</p>
+    <button id="retry" type="button">Try again</button>
+  </main>
+  <script src="offline.js"></script>
+</body>
+</html>

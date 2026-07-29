@@ -18,7 +18,7 @@
   header .brand { display:flex; align-items:center; gap:8px; font-weight:700; font-size:19px; letter-spacing:-.01em; }
   header .brand span { color:var(--accent); }
   .logomark { background:var(--grad); display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; border-radius:7px; width:26px; height:26px; }
-  .logomark svg { width:66%; height:66%; display:block; }
+.logomark img { width:100%; height:100%; display:block; border-radius:7px; }
   header .doc-title { font-size:13px; color:var(--sub2); }
   main { max-width:900px; margin:0 auto; padding:20px 16px 100px; }
   .banner { background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:16px; font-size:13.5px; color:var(--sub); line-height:1.5; }
@@ -89,7 +89,7 @@
 
 <div id="signApp" hidden>
   <header>
-    <div><div class="brand"><span class="logomark"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M26 14 h30 l14 14 v58 a4 4 0 0 1 -4 4 H26 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" fill="#fff"/><path d="M56 14 v14 h14" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="4" stroke-linejoin="round"/><path d="M46 60 v-16 M39 44 h14 M39 60 h14" fill="none" stroke="#6A4CF0" stroke-width="5" stroke-linecap="round"/></svg></span>Signet<span>.</span></div><div class="doc-title" id="docTitle"></div></div>
+    <div><div class="brand"><span class="logomark"><img src="/icon.svg" alt="" /></span>Signet<span>.</span></div><div class="doc-title" id="docTitle"></div></div>
     <div id="progressLabel" style="font-size:12.5px;color:var(--sub2)"></div>
   </header>
   <main>
@@ -115,6 +115,7 @@
       <div style="margin-top:8px"><button class="btn secondary" id="sigClear">Clear</button></div></div>
     <div id="sm-type" hidden><input type="text" id="sigTypeInput" placeholder="Type your name" style="width:100%;font-size:26px;font-family:'Brush Script MT',cursive;padding:12px;border:1px solid var(--line);border-radius:8px" /></div>
     <div id="sm-upload" hidden><input type="file" id="sigUploadInput" accept="image/*" /></div>
+    <p id="sigError" role="alert" style="color:var(--bad);font-size:13px;min-height:18px;margin:10px 0 0"></p>
     <div class="foot"><button class="btn secondary" id="sigCancel">Cancel</button><button class="btn" id="sigUse">Use this signature</button></div>
   </div>
 </div>
@@ -295,7 +296,15 @@ function updateFieldsLeft() {
 // ---- signature modal (shared draw/type/upload flow) ----
 const sigModal = document.getElementById("sigModalBack");
 let sigTargetField = null;
-function openSigModal(field) { sigTargetField = field; sigModal.hidden = false; }
+function openSigModal(field) {
+  sigTargetField = field;
+  sigDirty = false;
+  sigCtx.clearRect(0, 0, sigPad.width, sigPad.height);
+  document.getElementById("sigTypeInput").value = "";
+  document.getElementById("sigUploadInput").value = "";
+  document.getElementById("sigError").textContent = "";
+  sigModal.hidden = false;
+}
 document.getElementById("sigCancel").onclick = () => (sigModal.hidden = true);
 for (const b of document.querySelectorAll("#sigModalBack .tabbtns button")) {
   b.onclick = () => {
@@ -309,7 +318,7 @@ for (const b of document.querySelectorAll("#sigModalBack .tabbtns button")) {
 const sigPad = document.getElementById("sigPad");
 const sigCtx = sigPad.getContext("2d");
 sigCtx.lineWidth = 2.4; sigCtx.strokeStyle = "#16232f"; sigCtx.lineCap = "round";
-let drawing = false, lastPt = null;
+let drawing = false, lastPt = null, sigDirty = false;
 function ptFromEvent(ev) {
   const r = sigPad.getBoundingClientRect();
   const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
@@ -317,24 +326,30 @@ function ptFromEvent(ev) {
   return [cx * (sigPad.width / r.width), cy * (sigPad.height / r.height)];
 }
 sigPad.addEventListener("pointerdown", (e) => { drawing = true; lastPt = ptFromEvent(e); });
-sigPad.addEventListener("pointermove", (e) => { if (!drawing) return; const [x, y] = ptFromEvent(e); sigCtx.beginPath(); sigCtx.moveTo(...lastPt); sigCtx.lineTo(x, y); sigCtx.stroke(); lastPt = [x, y]; });
+sigPad.addEventListener("pointermove", (e) => { if (!drawing) return; const [x, y] = ptFromEvent(e); sigCtx.beginPath(); sigCtx.moveTo(...lastPt); sigCtx.lineTo(x, y); sigCtx.stroke(); lastPt = [x, y]; sigDirty = true; });
 window.addEventListener("pointerup", () => (drawing = false));
-document.getElementById("sigClear").onclick = () => sigCtx.clearRect(0, 0, sigPad.width, sigPad.height);
+document.getElementById("sigClear").onclick = () => { sigCtx.clearRect(0, 0, sigPad.width, sigPad.height); sigDirty = false; };
 
 document.getElementById("sigUse").onclick = async () => {
   const activeTab = document.querySelector("#sigModalBack .tabbtns button.active").dataset.sm;
   let dataUrl;
+  const error = document.getElementById("sigError");
+  error.textContent = "";
   if (activeTab === "draw") {
+    if (!sigDirty) { error.textContent = "Draw your signature before continuing."; return; }
     dataUrl = sigPad.toDataURL("image/png");
   } else if (activeTab === "type") {
-    const name = document.getElementById("sigTypeInput").value || "Signed";
+    const name = document.getElementById("sigTypeInput").value.trim();
+    if (!name) { error.textContent = "Type your name before continuing."; return; }
     const c = document.createElement("canvas"); c.width = 480; c.height = 140;
     const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, c.height);
     cx.fillStyle = "#16232f"; cx.font = "52px 'Brush Script MT', cursive"; cx.fillText(name, 16, 88);
     dataUrl = c.toDataURL("image/png");
   } else {
     const file = document.getElementById("sigUploadInput").files[0];
-    if (!file) return alert("Choose an image file first.");
+    if (!file) { error.textContent = "Choose an image file first."; return; }
+    if (!/^image\/(?:png|jpe?g)$/i.test(file.type)) { error.textContent = "Use a PNG or JPEG image."; return; }
+    if (file.size > 2 * 1024 * 1024) { error.textContent = "Signature images must be 2 MB or smaller."; return; }
     dataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
   }
   state.values[sigTargetField.id] = { image: dataUrl };
@@ -348,7 +363,11 @@ document.getElementById("declineBtn").onclick = () => (document.getElementById("
 document.getElementById("declineCancel").onclick = () => (document.getElementById("declineModalBack").hidden = true);
 document.getElementById("declineConfirm").onclick = async () => {
   const reason = document.getElementById("declineReason").value;
-  await fetch(`/api/sign/${token}/decline`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason }) });
+  const res = await fetch(`/api/sign/${token}/decline`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason }) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    return showCenter("Could not decline", body.error || "This document can no longer be declined.");
+  }
   document.getElementById("declineModalBack").hidden = true;
   showCenter("Declined", "You've declined to sign this document. The sender has been notified.");
 };

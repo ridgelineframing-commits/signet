@@ -77,6 +77,7 @@ const tk = {
   ink: { color: "#dc2b3b", width: 3 },
   shape: { type: "rect", color: "#6A4CF0", fill: false, width: 2 },
   placeArmed: false,
+  autoFit: true,
 };
 const RECIPIENT_COLORS = ["#6A4CF0", "#17936a", "#b5760b", "#dc2b3b", "#7a3fb5"];
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -106,10 +107,10 @@ function hasDoc() { return !!tk.pdfDoc && tk.order.length > 0; }
 // Switching snapshots `tk` into the current slot and loads the target slot into `tk`.
 let openDocs = [];
 let activeTab = -1;
-const DOC_FIELDS = ["pdfDoc", "order", "annos", "fileName", "currentPage", "zoom", "_renderDoc", "_renderDirty", "_pageDims", "selectedAnno", "activeText"];
+const DOC_FIELDS = ["pdfDoc", "order", "annos", "fileName", "currentPage", "zoom", "autoFit", "_renderDoc", "_renderDirty", "_pageDims", "selectedAnno", "activeText"];
 function captureDoc() { const s = {}; for (const k of DOC_FIELDS) s[k] = tk[k]; s.undoStack = undoStack; s.redoStack = redoStack; return s; }
 function applyDoc(s) { for (const k of DOC_FIELDS) tk[k] = s[k]; undoStack = s.undoStack; redoStack = s.redoStack; }
-function blankDocState() { return { pdfDoc: null, order: [], annos: [], fileName: "", currentPage: 0, zoom: 100, _renderDoc: null, _renderDirty: true, _pageDims: null, selectedAnno: null, activeText: null, undoStack: [], redoStack: [] }; }
+function blankDocState() { return { pdfDoc: null, order: [], annos: [], fileName: "", currentPage: 0, zoom: 100, autoFit: true, _renderDoc: null, _renderDirty: true, _pageDims: null, selectedAnno: null, activeText: null, undoStack: [], redoStack: [] }; }
 function syncActive() { if (activeTab >= 0 && activeTab < openDocs.length) openDocs[activeTab] = captureDoc(); }
 function refreshDocChrome() {
   const has = hasDoc();
@@ -319,7 +320,9 @@ async function loadFiles(files, replacing) {
   if (!tk.order.length) return false;
   refreshDocChrome();
   invalidateRender();
+  tk.autoFit = true;
   await fullRerender();
+  requestAnimationFrame(zoomFit);
   renderTabs();
   return true;
 }
@@ -494,12 +497,16 @@ $("pnNext").onclick = () => { if (tk.currentPage < tk.order.length - 1) { tk.cur
 $("pnZoomOut").onclick = () => setZoom(tk.zoom - 10);
 $("pnZoomIn").onclick = () => setZoom(tk.zoom + 10);
 $("pnZoomReset").onclick = () => setZoom(100);
-function setZoom(z) { tk.zoom = Math.max(30, Math.min(400, Math.round(z))); applyZoom(); }
+function setZoom(z, manual = true) {
+  tk.autoFit = !manual;
+  tk.zoom = Math.max(30, Math.min(400, Math.round(z)));
+  applyZoom();
+}
 function zoomFit() {
   if (!hasDoc()) return;
   const scroll = $("canvasScroll"), shell = $("pageShell");
   const natW = shell.getBoundingClientRect().width / (tk.zoom / 100);
-  if (natW > 0) setZoom(Math.floor((scroll.clientWidth - 48) / natW * 100));
+  if (natW > 0) setZoom(Math.floor((scroll.clientWidth - 48) / natW * 100), false);
 }
 function applyZoom() {
   $("pageShell").style.transform = "scale(" + (tk.zoom / 100) + ")";
@@ -514,6 +521,7 @@ function selectTool(name) {
   tk.placeArmed = false;
   tk.activeText = null;
   document.querySelectorAll("#toolRail [data-tool], #menuBar [data-tool]").forEach((x) => x.classList.toggle("active", x.dataset.tool === name));
+  document.querySelectorAll("#toolRail [data-tool]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.tool === name)));
   // Signature needs drawing room — on wide screens show it as a centered popup, not the ribbon strip.
   const sigPopup = name === "signature" && !isMobile();
   document.body.classList.toggle("ribbon-popup", sigPopup);
@@ -522,15 +530,40 @@ function selectTool(name) {
   renderPropsPanel();
   if (isMobile()) openPropsSheet(); // reveal the properties bottom-sheet on mobile
 }
-document.querySelectorAll("#toolRail [data-tool]").forEach((b) => { b.onclick = () => selectTool(b.dataset.tool); });
+document.querySelectorAll("#toolRail [data-tool]").forEach((b) => {
+  const label = (b.title || TOOL_LABELS[b.dataset.tool]?.[0] || b.dataset.tool).replace(/\s+[—-].*$/, "");
+  b.dataset.label = label;
+  b.setAttribute("aria-label", label);
+  b.setAttribute("aria-pressed", String(b.classList.contains("active")));
+  b.onclick = () => selectTool(b.dataset.tool);
+});
 $("ribbonScrim").onclick = () => selectTool("select");
 
 // ---- Word-style header menu bar: dropdowns set the tool or run an action ----
-function closeMenus() { document.querySelectorAll("#menuBar .menu.open").forEach((m) => m.classList.remove("open")); }
+function closeMenus() {
+  document.querySelectorAll("#menuBar .menu.open").forEach((m) => m.classList.remove("open"));
+  document.querySelectorAll("#menuBar .menutop").forEach((btn) => btn.setAttribute("aria-expanded", "false"));
+}
 document.querySelectorAll("#menuBar .menu > .menutop").forEach((btn) => {
   const menu = btn.parentElement;
-  btn.onclick = (e) => { e.stopPropagation(); const wasOpen = menu.classList.contains("open"); closeMenus(); if (!wasOpen) menu.classList.add("open"); };
-  btn.onmouseenter = () => { if (document.querySelector("#menuBar .menu.open") && !menu.classList.contains("open")) { closeMenus(); menu.classList.add("open"); } };
+  const popup = menu.querySelector(".menupop");
+  btn.setAttribute("aria-haspopup", "menu");
+  btn.setAttribute("aria-expanded", "false");
+  popup?.setAttribute("role", "menu");
+  popup?.querySelectorAll(".mi").forEach((item) => item.setAttribute("role", "menuitem"));
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    const wasOpen = menu.classList.contains("open");
+    closeMenus();
+    if (!wasOpen) { menu.classList.add("open"); btn.setAttribute("aria-expanded", "true"); }
+  };
+  btn.onmouseenter = () => {
+    if (document.querySelector("#menuBar .menu.open") && !menu.classList.contains("open")) {
+      closeMenus();
+      menu.classList.add("open");
+      btn.setAttribute("aria-expanded", "true");
+    }
+  };
 });
 document.addEventListener("click", closeMenus);
 function runMenuAct(act) {
@@ -544,7 +577,7 @@ function runMenuAct(act) {
     zoomin: () => setZoom(tk.zoom + 10), zoomout: () => setZoom(tk.zoom - 10), zoomreset: () => setZoom(100), zoomfit: zoomFit,
     togglePages: () => $("togglePages").click(),
     shortcuts: () => { $("helpModalBack").hidden = false; },
-    tutorial: () => toast("Tutorial coming soon — it's on the way!"),
+    tutorial: () => { $("helpModalBack").hidden = false; },
     merge: () => mergeOpenDocs(),
   }[act] || (() => {}))();
 }
@@ -569,6 +602,11 @@ $("thumbScrim").onclick = closeThumbs;
 $("propsClose").onclick = closePropsSheet;
 // Leaving mobile width resets any mobile drawers/sheets so the desktop layout is clean.
 window.matchMedia("(max-width:820px)").addEventListener("change", (e) => { if (!e.matches) { closeThumbs(); closePropsSheet(); } });
+let fitResizeTimer = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(fitResizeTimer);
+  fitResizeTimer = setTimeout(() => { if (tk.autoFit) zoomFit(); }, 120);
+});
 
 // ---------------------------------------------------------------- collapsible side panels (desktop)
 // The Pages rail (left) and the info/properties panel (right) can each be
@@ -1213,7 +1251,7 @@ function buildTextPanel(body) {
     <p class="hint" style="margin-bottom:14px">${a ? "Editing text — type directly on the page. Styling applies to this box." : "Click anywhere on the page to add text, then just type."}</p>
     <div class="row">
       <div class="field"><div class="label">Size</div><input type="number" id="pSize" value="${t.size}" min="6" max="96" style="width:100%" /></div>
-      <div class="field"><div class="label">Color</div><input type="color" id="pColor" value="${t.color}" style="width:100%;height:38px" /></div>
+      <div class="field"><div class="label">Color</div><div class="color-control"><input type="color" id="pColor" value="${t.color}" aria-label="Text color" /><input type="text" id="pColorHex" value="${t.color}" maxlength="7" aria-label="Text color hex value" /></div></div>
     </div>
     <div class="label" style="margin-top:14px">Style</div>
     <div class="row" style="margin-bottom:12px">
@@ -1228,7 +1266,15 @@ function buildTextPanel(body) {
   // Commit a style change to the focused text (or defaults) and reflect it live on the page.
   const apply = () => { if (a && a._el) styleTextEl(a._el, a); renderPropsPanel(); };
   $("pSize").oninput = (e) => { t.size = Number(e.target.value) || 14; if (a && a._el) styleTextEl(a._el, a); };
-  $("pColor").oninput = (e) => { t.color = e.target.value; if (a && a._el) styleTextEl(a._el, a); };
+  const applyColor = (value) => {
+    if (!/^#[0-9a-f]{6}$/i.test(value)) return;
+    t.color = value;
+    $("pColor").value = value;
+    $("pColorHex").value = value.toUpperCase();
+    if (a && a._el) styleTextEl(a._el, a);
+  };
+  $("pColor").oninput = (e) => applyColor(e.target.value);
+  $("pColorHex").onchange = (e) => applyColor(e.target.value.startsWith("#") ? e.target.value : `#${e.target.value}`);
   // preventDefault on mousedown keeps the caret in the on-page text box when toggling styles.
   for (const [id, prop] of [["pBold", "bold"], ["pItalic", "italic"], ["pUnderline", "underline"]]) {
     const btn = $(id);
@@ -1241,7 +1287,7 @@ function buildTextPanel(body) {
   });
 }
 
-let sigPadCtx = null, sigDrawing = false, sigLast = null, sigActiveTab = "draw", sigUploadDataUrl = null;
+let sigPadCtx = null, sigDrawing = false, sigLast = null, sigPadDirty = false, sigActiveTab = "draw", sigUploadDataUrl = null;
 // Saved signatures — persisted in the browser so you can reuse them on every
 // document without redrawing. Purely local (localStorage); nothing is uploaded
 // and no sign-in is involved.
@@ -1293,24 +1339,27 @@ function buildSigPanel(body) {
     };
   });
   if (sigActiveTab === "draw") {
-    const pad = $("sigPad"); sigPadCtx = pad.getContext("2d");
+    const pad = $("sigPad"); sigPadDirty = false; sigPadCtx = pad.getContext("2d");
     sigPadCtx.lineWidth = 2.4; sigPadCtx.strokeStyle = "#16232f"; sigPadCtx.lineCap = "round";
     const ptFrom = (ev) => { const r = pad.getBoundingClientRect(); const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left; const cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top; return [cx * (pad.width / r.width), cy * (pad.height / r.height)]; };
     pad.onpointerdown = (ev) => { sigDrawing = true; sigLast = ptFrom(ev); };
-    pad.onpointermove = (ev) => { if (!sigDrawing) return; const [x, y] = ptFrom(ev); sigPadCtx.beginPath(); sigPadCtx.moveTo(...sigLast); sigPadCtx.lineTo(x, y); sigPadCtx.stroke(); sigLast = [x, y]; };
+    pad.onpointermove = (ev) => { if (!sigDrawing) return; const [x, y] = ptFrom(ev); sigPadCtx.beginPath(); sigPadCtx.moveTo(...sigLast); sigPadCtx.lineTo(x, y); sigPadCtx.stroke(); sigLast = [x, y]; sigPadDirty = true; };
     window.addEventListener("pointerup", () => (sigDrawing = false));
-    $("sigClear").onclick = () => sigPadCtx.clearRect(0, 0, pad.width, pad.height);
+    $("sigClear").onclick = () => { sigPadCtx.clearRect(0, 0, pad.width, pad.height); sigPadDirty = false; };
   }
   if (sigActiveTab === "upload") {
     $("sigUploadInput").onchange = async (e) => {
       const file = e.target.files[0]; if (!file) return;
+      if (!/^image\/(?:png|jpe?g)$/i.test(file.type)) { e.target.value = ""; sigUploadDataUrl = null; return toast("Use a PNG or JPEG signature image.", "error"); }
+      if (file.size > 2 * 1024 * 1024) { e.target.value = ""; sigUploadDataUrl = null; return toast("Signature images must be 2 MB or smaller.", "error"); }
       sigUploadDataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
     };
   }
   async function buildDataUrl() {
-    if (sigActiveTab === "draw") return $("sigPad").toDataURL("image/png");
+    if (sigActiveTab === "draw") return sigPadDirty ? $("sigPad").toDataURL("image/png") : null;
     if (sigActiveTab === "type") {
-      const name = $("sigTypeInput").value || "Signed";
+      const name = $("sigTypeInput").value.trim();
+      if (!name) return null;
       const c = document.createElement("canvas"); c.width = 500; c.height = 140;
       const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, c.height);
       cx.fillStyle = "#16232f"; cx.font = "56px 'Brush Script MT', cursive"; cx.fillText(name, 20, 90);
@@ -1660,8 +1709,16 @@ async function flattenNow() {
 $("downloadBtn").onclick = async () => { if (!hasDoc()) return; const bytes = await bakeAndExport(); downloadBytes(bytes, (tk.fileName || "signet-export").replace(/\.pdf$/i, "") + "-export.pdf"); };
 
 // ------------------------------------------------------------------ envelopes: requests drawer
-const STATUS_LABEL = { draft: "Draft", sent: "Sent", partially_signed: "Partially signed", completed: "Completed", voided: "Voided", declined: "Declined" };
-const STATUS_COLOR = { draft: ["#eef2f6", "#5b6068"], sent: ["#eef1ff", "#6A4CF0"], partially_signed: ["#fff3e0", "#b5760b"], completed: ["#e4f6ea", "#17936a"], voided: ["#fbf5f5", "#dc2b3b"], declined: ["#fbf5f5", "#dc2b3b"] };
+const STATUS_LABEL = {
+  draft: "Draft", sent: "Sent", partially_signed: "Partially signed", completing: "Finalizing",
+  delivery_partial: "Delivery issue", delivery_failed: "Delivery failed",
+  completed: "Completed", voided: "Voided", declined: "Declined",
+};
+const STATUS_COLOR = {
+  draft: ["#eef2f6", "#5b6068"], sent: ["#eef1ff", "#6A4CF0"], partially_signed: ["#fff3e0", "#b5760b"],
+  completing: ["#eef1ff", "#6A4CF0"], delivery_partial: ["#fff3e0", "#b5760b"], delivery_failed: ["#fbf5f5", "#dc2b3b"],
+  completed: ["#e4f6ea", "#17936a"], voided: ["#fbf5f5", "#dc2b3b"], declined: ["#fbf5f5", "#dc2b3b"],
+};
 const envelopesPanel = $("envelopesPanelBack");
 $("openEnvelopesBtn").onclick = async () => { if (!(await ensureAuth("Sign in to view your signature requests."))) return; envelopesPanel.hidden = false; refreshEnvelopes(); };
 $("closeEnvelopesPanel").onclick = () => (envelopesPanel.hidden = true);
@@ -1690,15 +1747,16 @@ async function refreshEnvelopes() {
 async function openEnvelope(id) {
   const { envelope, recipients, audit } = await api(`/api/admin/envelopes/${id}`);
   const card = $("envDetailCard");
+  const [statusBg, statusFg] = STATUS_COLOR[envelope.status] || ["#eef2f6", "#5b6068"];
   card.innerHTML = `
-    <div class="row" style="justify-content:space-between"><div style="font-size:15px;font-weight:700">${escapeHtml(envelope.title)}</div><span class="pill" style="background:${STATUS_COLOR[envelope.status][0]};color:${STATUS_COLOR[envelope.status][1]}">${STATUS_LABEL[envelope.status] || envelope.status}</span></div>
+    <div class="row" style="justify-content:space-between"><div style="font-size:15px;font-weight:700">${escapeHtml(envelope.title)}</div><span class="pill" style="background:${statusBg};color:${statusFg}">${STATUS_LABEL[envelope.status] || envelope.status}</span></div>
     <div class="label" style="margin-top:14px">Recipients</div>
     ${recipients.map((r) => `<div class="rowbox"><div class="avatar">${escapeHtml((r.name || "?").slice(0, 2).toUpperCase())}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${escapeHtml(r.name)}</div><div class="hint">${escapeHtml(r.email)}</div></div><span class="chip">${r.role}</span><span class="hint">${r.status}</span>${r.status !== "signed" ? `<button class="btn" data-remind="${r.id}" style="height:28px;padding:0 8px">Remind</button>` : ""}</div>`).join("")}
     <div class="label" style="margin-top:14px">Audit trail</div>
     <div style="max-height:160px;overflow:auto">${audit.map((a) => `<div class="hint" style="padding:4px 0;border-bottom:1px solid #eeeef1">${new Date(a.created_at).toLocaleString()} — ${a.event}${a.detail ? " — " + escapeHtml(a.detail) : ""}</div>`).join("")}</div>
     <div class="row" style="margin-top:14px">
       ${envelope.status === "completed" ? `<a class="btn primary" href="/api/admin/envelopes/${envelope.id}/download">Download signed PDF</a>` : ""}
-      ${!["voided", "completed", "declined"].includes(envelope.status) ? `<button class="btn danger" id="voidBtn">Void envelope</button>` : ""}
+      ${!["voided", "completed", "declined", "completing"].includes(envelope.status) ? `<button class="btn danger" id="voidBtn">Void envelope</button>` : ""}
     </div>`;
   card.querySelectorAll("[data-remind]").forEach((b) => (b.onclick = async () => { await api(`/api/admin/envelopes/${id}/remind/${b.dataset.remind}`, { method: "POST" }); toast("Reminder sent.", "success"); }));
   const voidBtn = card.querySelector("#voidBtn");
@@ -1822,7 +1880,14 @@ function placeEnvField(e, box, pageIdx) {
   const rect = box.getBoundingClientRect();
   const x = (e.clientX - rect.left) / rect.width, y = (e.clientY - rect.top) / rect.height;
   const [w, h] = FIELD_DEFAULT_SIZE[ev.currentFieldType];
-  ev.fields.push({ recipientIndex: ev.currentRecipient, type: ev.currentFieldType, page: pageIdx, x, y: Math.max(0, y - h / 2), w, h, required: true, label: ev.currentFieldType });
+  ev.fields.push({
+    recipientIndex: ev.currentRecipient,
+    type: ev.currentFieldType,
+    page: pageIdx,
+    x: Math.max(0, Math.min(1 - w, x)),
+    y: Math.max(0, Math.min(1 - h, y - h / 2)),
+    w, h, required: true, label: ev.currentFieldType,
+  });
   drawEnvMarkers(box, pageIdx);
 }
 $("envSend").onclick = async () => {
@@ -1837,7 +1902,16 @@ $("envSend").onclick = async () => {
   form.append("fields", JSON.stringify(ev.fields));
   form.append("sendNow", "true");
   form.append("requireOtp", $("envRequireOtp").checked ? "true" : "false");
-  try { await api("/api/admin/envelopes", { method: "POST", body: form }); envModal.hidden = true; envelopesPanel.hidden = false; refreshEnvelopes(); toast("Sent for signature.", "success"); }
+  try {
+    const result = await api("/api/admin/envelopes", { method: "POST", body: form });
+    envModal.hidden = true;
+    envelopesPanel.hidden = false;
+    refreshEnvelopes();
+    const failed = result.delivery?.failedCount || 0;
+    const sent = result.delivery?.notifiedCount || 0;
+    if (failed) toast(`Saved, but ${failed} invitation${failed === 1 ? "" : "s"} could not be delivered. ${sent ? `${sent} sent.` : "Check email configuration."}`, "error");
+    else toast(`Sent ${sent || ""} invitation${sent === 1 ? "" : "s"} for signature.`.replace("Sent  invitation", "Sent invitation"), "success");
+  }
   catch (e) { toast("Couldn't send: " + e.message, "error"); }
 };
 
