@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { PDFDocument } from "pdf-lib";
-import { requireAdmin, issueSession } from "./lib/auth.js";
+import { requireAdmin, issueSession, timingSafeStringEqual } from "./lib/auth.js";
 import {
   sendSigningInvite,
   sendViewedNotice,
@@ -11,15 +11,49 @@ import {
 } from "./lib/email.js";
 import { flattenEnvelope, appendCertificatePage } from "./lib/pdf.js";
 import { uuid, newToken, hashIp, nowIso, jsonError, sha256Hex } from "./lib/util.js";
+import {
+  MAX_ENVELOPE_PDF_BYTES,
+  ValidationError,
+  parseJsonArray,
+  validateEnvelopeFields,
+  validateEnvelopeMetadata,
+  validateSubmittedValue,
+} from "./lib/validation.js";
 
 const app = new Hono();
+
+app.use("/api/*", async (c, next) => {
+  await next();
+  c.header("Cache-Control", "no-store");
+  c.header("Referrer-Policy", "no-referrer");
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "DENY");
+  c.header("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+});
+
+async function enforceRateLimit(binding, key, message) {
+  if (!binding) return null; // Keeps local development usable if bindings are intentionally omitted.
+  const { success } = await binding.limit({ key });
+  return success ? null : jsonError(message, 429);
+}
+
+function requestActor(request) {
+  return request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "local";
+}
 
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 app.post("/api/auth/login", async (c) => {
+  const limited = await enforceRateLimit(
+    c.env.AUTH_RATE_LIMITER,
+    `login:${requestActor(c.req.raw)}`,
+    "Too many sign-in attempts. Wait a minute and try again."
+  );
+  if (limited) return limited;
   const { password } = await c.req.json().catch(() => ({}));
-  if (!c.env.ADMIN_PASSWORD || password !== c.env.ADMIN_PASSWORD) {
+  if (!c.env.SESSION_SECRET) return jsonError("Server authentication is not configured", 503);
+  if (!c.env.ADMIN_PASSWORD || !(await timingSafeStringEqual(password, c.env.ADMIN_PASSWORD))) {
     return jsonError("Wrong password", 401);
   }
   const token = await issueSession(c.env);
@@ -34,17 +68,25 @@ admin.use("*", requireAdmin);
 
 admin.post("/envelopes", async (c) => {
   const form = await c.req.formData();
-  const title = form.get("title") || "Untitled document";
-  const message = form.get("message") || "";
-  const senderName = form.get("senderName") || "";
-  const senderEmail = form.get("senderEmail") || "";
   const file = form.get("file");
-  const recipients = JSON.parse(form.get("recipients") || "[]");
-  const fields = JSON.parse(form.get("fields") || "[]");
+  const rawRecipients = parseJsonArray(form.get("recipients"), "Recipients");
+  const rawFields = parseJsonArray(form.get("fields"), "Fields");
   const requireOtp = form.get("requireOtp") === "true";
+  const sendNow = form.get("sendNow") !== "false";
+  const metadata = validateEnvelopeMetadata({
+    title: form.get("title"),
+    message: form.get("message"),
+    senderName: form.get("senderName"),
+    senderEmail: form.get("senderEmail"),
+    recipients: rawRecipients,
+  });
+  const { title, message, senderName, senderEmail, recipients } = metadata;
 
-  if (!file) return jsonError("Missing PDF file");
-  if (!recipients.length) return jsonError("Add at least one recipient");
+  if (!file || typeof file.arrayBuffer !== "function") return jsonError("Missing PDF file");
+  if (file.size > MAX_ENVELOPE_PDF_BYTES) return jsonError("PDF files sent for signature must be 50 MB or smaller", 413);
+  if (sendNow && (!c.env.RESEND_API_KEY || !c.env.MAIL_FROM)) {
+    return jsonError("Email delivery is not configured. Add RESEND_API_KEY and MAIL_FROM before sending.");
+  }
   // OTP codes are delivered by email, so requiring OTP without email configured would lock
   // signers out. Reject that combination up front.
   if (requireOtp && !c.env.RESEND_API_KEY) {
@@ -54,62 +96,61 @@ admin.post("/envelopes", async (c) => {
   const envelopeId = uuid();
   const originalBytes = new Uint8Array(await file.arrayBuffer());
   const originalKey = `envelopes/${envelopeId}/original.pdf`;
-  await c.env.FILES.put(originalKey, originalBytes, { httpMetadata: { contentType: "application/pdf" } });
 
-  // Load once to validate the file is a real PDF and grab a page count.
+  // Validate the complete payload before anything is persisted.
   const doc = await PDFDocument.load(originalBytes).catch(() => null);
   if (!doc) return jsonError("That file doesn't look like a valid PDF");
   const pageCount = doc.getPageCount();
+  const fields = validateEnvelopeFields(rawFields, recipients, pageCount);
+  await c.env.FILES.put(originalKey, originalBytes, { httpMetadata: { contentType: "application/pdf" } });
 
   const db = c.env.DB;
-  await db
-    .prepare(
+  const recipientIdByIndex = recipients.map(() => uuid());
+  const statements = [
+    db.prepare(
       `INSERT INTO envelopes (id, title, status, original_key, page_count, sender_name, sender_email, message, require_otp)
        VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?)`
     )
-    .bind(envelopeId, title, originalKey, pageCount, senderName, senderEmail, message, requireOtp ? 1 : 0)
-    .run();
-
-  const recipientIdByIndex = [];
-  for (const r of recipients) {
-    const id = uuid();
-    recipientIdByIndex.push(id);
-    await db
-      .prepare(
+      .bind(envelopeId, title, originalKey, pageCount, senderName, senderEmail, message, requireOtp ? 1 : 0),
+    ...recipients.map((r, index) =>
+      db.prepare(
         `INSERT INTO recipients (id, envelope_id, name, email, role, sign_order, token, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`
       )
-      .bind(id, envelopeId, r.name, r.email, r.role || "signer", r.order ?? 1, newToken())
-      .run();
-  }
-
-  for (const f of fields) {
-    const recipientId = recipientIdByIndex[f.recipientIndex];
-    if (!recipientId) continue;
-    await db
-      .prepare(
+        .bind(recipientIdByIndex[index], envelopeId, r.name, r.email, r.role, r.order, newToken())
+    ),
+    ...fields.map((f) =>
+      db.prepare(
         `INSERT INTO fields (id, envelope_id, recipient_id, type, page, x, y, w, h, required, label)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(uuid(), envelopeId, recipientId, f.type, f.page, f.x, f.y, f.w, f.h, f.required ? 1 : 0, f.label || "")
-      .run();
+        .bind(uuid(), envelopeId, recipientIdByIndex[f.recipientIndex], f.type, f.page, f.x, f.y, f.w, f.h, f.required ? 1 : 0, f.label)
+    ),
+    db.prepare(
+      `INSERT INTO audit_events (id, envelope_id, recipient_id, event, detail, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(uuid(), envelopeId, null, "created", `${recipients.length} recipient(s), ${fields.length} field(s)`, nowIso()),
+  ];
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    await c.env.FILES.delete(originalKey).catch(() => {});
+    throw error;
   }
 
-  await logEvent(db, envelopeId, null, "created", `${recipients.length} recipient(s), ${fields.length} field(s)`);
-
-  const sendNow = form.get("sendNow") !== "false";
+  let delivery = { notifiedCount: 0, failedCount: 0 };
   if (sendNow) {
-    await sendToNextGroup(c.env, envelopeId, { justCreated: true });
+    delivery = await sendToNextGroup(c.env, envelopeId, { justCreated: true });
   }
 
-  return c.json({ id: envelopeId });
+  return c.json({ id: envelopeId, delivery });
 });
 
 admin.get("/envelopes", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT e.*,
-       (SELECT COUNT(*) FROM recipients r WHERE r.envelope_id = e.id) as recipient_count,
-       (SELECT COUNT(*) FROM recipients r WHERE r.envelope_id = e.id AND r.status = 'signed') as signed_count
+       (SELECT COUNT(*) FROM recipients r WHERE r.envelope_id = e.id AND r.role != 'cc') as recipient_count,
+       (SELECT COUNT(*) FROM recipients r WHERE r.envelope_id = e.id AND r.role != 'cc' AND r.status = 'signed') as signed_count
      FROM envelopes e ORDER BY e.created_at DESC`
   ).all();
   return c.json({ envelopes: results });
@@ -123,9 +164,14 @@ admin.get("/envelopes/:id", async (c) => {
 
 admin.post("/envelopes/:id/void", async (c) => {
   const id = c.req.param("id");
-  await c.env.DB.prepare(`UPDATE envelopes SET status = 'voided', voided_at = ? WHERE id = ?`)
+  const result = await c.env.DB.prepare(
+    `UPDATE envelopes SET status = 'voided', voided_at = ?
+     WHERE id = ? AND status NOT IN ('completed', 'voided', 'declined', 'completing')
+       AND NOT EXISTS (SELECT 1 FROM recipients r WHERE r.envelope_id = envelopes.id AND r.status = 'signing')`
+  )
     .bind(nowIso(), id)
     .run();
+  if (result.meta.changes !== 1) return jsonError("This request is already finished or cannot be voided", 409);
   await logEvent(c.env.DB, id, null, "voided", "");
   return c.json({ ok: true });
 });
@@ -134,10 +180,17 @@ admin.post("/envelopes/:id/remind/:recipientId", async (c) => {
   const { id, recipientId } = c.req.param();
   const env = c.env;
   const envelope = await env.DB.prepare(`SELECT * FROM envelopes WHERE id = ?`).bind(id).first();
-  const recipient = await env.DB.prepare(`SELECT * FROM recipients WHERE id = ?`).bind(recipientId).first();
+  const recipient = await env.DB.prepare(`SELECT * FROM recipients WHERE id = ? AND envelope_id = ?`).bind(recipientId, id).first();
   if (!envelope || !recipient) return jsonError("Not found", 404);
+  if (["completed", "voided", "declined", "completing"].includes(envelope.status) || recipient.status === "signed") {
+    return jsonError("This recipient can no longer be reminded", 409);
+  }
   const signUrl = `${env.APP_URL}/sign?t=${recipient.token}`;
-  await sendSigningInvite(env, { envelope, recipient, signUrl });
+  const delivery = await sendSigningInvite(env, { envelope, recipient, signUrl });
+  if (!delivery?.ok) {
+    await logEvent(env.DB, id, recipient.id, "delivery_failed", "reminder");
+    return jsonError("The reminder could not be delivered. Check email configuration and try again.", 502);
+  }
   await logEvent(env.DB, id, recipient.id, "reminded", "");
   return c.json({ ok: true });
 });
@@ -195,6 +248,8 @@ app.get("/api/sign/:token", async (c) => {
 // Request an email OTP for this signer (only meaningful when the envelope requires it).
 app.post("/api/sign/:token/otp", async (c) => {
   const token = c.req.param("token");
+  const limited = await enforceRateLimit(c.env.OTP_RATE_LIMITER, `otp:${token}`, "Too many code requests. Wait a minute and try again.");
+  if (limited) return limited;
   const db = c.env.DB;
   const recipient = await db.prepare(`SELECT * FROM recipients WHERE token = ?`).bind(token).first();
   if (!recipient) return jsonError("Invalid or expired link", 404);
@@ -202,18 +257,25 @@ app.post("/api/sign/:token/otp", async (c) => {
   if (!envelope) return jsonError("Not found", 404);
   if (!envelope.require_otp) return c.json({ required: false });
   if (recipient.status === "signed") return jsonError("You've already signed this document");
+  if (["completed", "voided", "declined", "completing"].includes(envelope.status)) return jsonError("This document is no longer available for signing", 409);
 
   const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
   const otpHash = await sha256Hex(code + ":" + token);
   const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const delivery = await sendOtpCode(c.env, { envelope, recipient, code });
+  if (!delivery?.ok) {
+    await logEvent(db, envelope.id, recipient.id, "delivery_failed", "otp");
+    return jsonError("The verification code could not be delivered. Try again shortly.", 502);
+  }
   await db.prepare(`UPDATE recipients SET otp_hash = ?, otp_expires = ?, otp_verified = 0 WHERE id = ?`).bind(otpHash, expires, recipient.id).run();
-  await sendOtpCode(c.env, { envelope, recipient, code });
   await logEvent(db, envelope.id, recipient.id, "otp_sent", "");
   return c.json({ required: true, sent: true, to: maskEmail(recipient.email) });
 });
 
 app.post("/api/sign/:token/verify-otp", async (c) => {
   const token = c.req.param("token");
+  const limited = await enforceRateLimit(c.env.OTP_VERIFY_RATE_LIMITER, `verify:${token}`, "Too many incorrect attempts. Wait a minute and try again.");
+  if (limited) return limited;
   const { code } = await c.req.json().catch(() => ({}));
   const db = c.env.DB;
   const recipient = await db.prepare(`SELECT * FROM recipients WHERE token = ?`).bind(token).first();
@@ -221,8 +283,8 @@ app.post("/api/sign/:token/verify-otp", async (c) => {
   if (!recipient.otp_hash || !recipient.otp_expires) return jsonError("Request a code first");
   if (new Date(recipient.otp_expires).getTime() < Date.now()) return jsonError("That code has expired — request a new one");
   const attempt = await sha256Hex(String(code || "").trim() + ":" + token);
-  if (attempt !== recipient.otp_hash) return jsonError("Incorrect code");
-  await db.prepare(`UPDATE recipients SET otp_verified = 1 WHERE id = ?`).bind(recipient.id).run();
+  if (!(await timingSafeStringEqual(attempt, recipient.otp_hash))) return jsonError("Incorrect code");
+  await db.prepare(`UPDATE recipients SET otp_verified = 1, otp_hash = NULL, otp_expires = NULL WHERE id = ?`).bind(recipient.id).run();
   await logEvent(db, recipient.envelope_id, recipient.id, "otp_verified", "");
   return c.json({ ok: true });
 });
@@ -240,18 +302,34 @@ app.get("/api/sign/:token/pdf", async (c) => {
 app.post("/api/sign/:token/decline", async (c) => {
   const token = c.req.param("token");
   const { reason } = await c.req.json().catch(() => ({}));
+  const cleanReason = String(reason || "").trim();
+  if (cleanReason.length > 2000) return jsonError("Decline reason is too long", 413);
   const db = c.env.DB;
   const recipient = await db.prepare(`SELECT * FROM recipients WHERE token = ?`).bind(token).first();
   if (!recipient) return jsonError("Invalid link", 404);
   const envelope = await db.prepare(`SELECT * FROM envelopes WHERE id = ?`).bind(recipient.envelope_id).first();
-
-  await db
-    .prepare(`UPDATE recipients SET status = 'declined', declined_at = ?, decline_reason = ? WHERE id = ?`)
-    .bind(nowIso(), reason || "", recipient.id)
-    .run();
-  await db.prepare(`UPDATE envelopes SET status = 'declined' WHERE id = ?`).bind(envelope.id).run();
-  await logEvent(db, envelope.id, recipient.id, "declined", reason || "");
-  await sendDeclinedNotice(c.env, { envelope, recipient, reason });
+  if (!envelope || ["completed", "voided", "declined", "completing"].includes(envelope.status) || recipient.status === "signed") {
+    return jsonError("This document can no longer be declined", 409);
+  }
+  const recipientClaim = await db.prepare(
+    `UPDATE recipients SET status = 'declining' WHERE id = ? AND status IN ('pending', 'notified', 'viewed')`
+  ).bind(recipient.id).run();
+  if (recipientClaim.meta.changes !== 1) return jsonError("This document can no longer be declined", 409);
+  const transition = await db.prepare(
+    `UPDATE envelopes SET status = 'declined'
+     WHERE id = ? AND status NOT IN ('completed', 'voided', 'declined', 'completing')
+       AND NOT EXISTS (SELECT 1 FROM recipients r WHERE r.envelope_id = envelopes.id AND r.status = 'signing')`
+  ).bind(envelope.id).run();
+  if (transition.meta.changes !== 1) {
+    await db.prepare(`UPDATE recipients SET status = ? WHERE id = ? AND status = 'declining'`).bind(recipient.status, recipient.id).run();
+    return jsonError("This document can no longer be declined", 409);
+  }
+  await db.prepare(
+    `UPDATE recipients SET status = 'declined', declined_at = ?, decline_reason = ?
+     WHERE id = ? AND status = 'declining'`
+  ).bind(nowIso(), cleanReason, recipient.id).run();
+  await logEvent(db, envelope.id, recipient.id, "declined", cleanReason);
+  await sendDeclinedNotice(c.env, { envelope, recipient, reason: cleanReason });
   return c.json({ ok: true });
 });
 
@@ -263,10 +341,11 @@ app.post("/api/sign/:token", async (c) => {
 
   const recipient = await db.prepare(`SELECT * FROM recipients WHERE token = ?`).bind(token).first();
   if (!recipient) return jsonError("Invalid or expired link", 404);
+  if (recipient.role === "cc") return jsonError("This recipient does not have signing fields", 403);
   if (recipient.status === "signed") return jsonError("You've already signed this document");
 
   const envelope = await db.prepare(`SELECT * FROM envelopes WHERE id = ?`).bind(recipient.envelope_id).first();
-  if (!envelope || ["voided", "declined", "completed"].includes(envelope.status)) {
+  if (!envelope || ["voided", "declined", "completed", "completing"].includes(envelope.status)) {
     return jsonError("This document is no longer available for signing");
   }
   if (envelope.require_otp && !recipient.otp_verified) {
@@ -278,34 +357,49 @@ app.post("/api/sign/:token", async (c) => {
     .bind(recipient.id)
     .all();
 
-  const values = body.values || {}; // { [fieldId]: { text?: string, image?: base64 } }
+  const values = body.values && typeof body.values === "object" && !Array.isArray(body.values) ? body.values : {};
+  const normalizedValues = new Map();
   for (const f of myFields) {
-    const v = values[f.id];
+    const v = validateSubmittedValue(f, values[f.id]);
+    normalizedValues.set(f.id, v);
     if (f.required && (!v || (!v.text && !v.image))) {
       return jsonError(`Missing required field: ${f.label || f.type}`);
     }
   }
 
-  for (const f of myFields) {
-    const v = values[f.id];
-    if (!v) continue;
-    await db
-      .prepare(
+  const claimed = await db.prepare(
+    `UPDATE recipients SET status = 'signing'
+     WHERE id = ? AND status IN ('pending', 'notified', 'viewed')
+       AND EXISTS (
+         SELECT 1 FROM envelopes e
+         WHERE e.id = recipients.envelope_id AND e.status NOT IN ('voided', 'declined', 'completed', 'completing')
+       )`
+  ).bind(recipient.id).run();
+  if (claimed.meta.changes !== 1) return jsonError("This signing request is already being submitted", 409);
+
+  try {
+    const valueStatements = myFields.flatMap((f) => {
+      const v = normalizedValues.get(f.id);
+      if (!v) return [];
+      return [db.prepare(
         `INSERT INTO field_values (field_id, value_text, value_image, filled_at)
          VALUES (?, ?, ?, ?)
          ON CONFLICT(field_id) DO UPDATE SET value_text = excluded.value_text, value_image = excluded.value_image, filled_at = excluded.filled_at`
       )
-      .bind(f.id, v.text || null, v.image || null, nowIso())
-      .run();
-  }
+        .bind(f.id, v.text || null, v.image || null, nowIso())];
+    });
+    if (valueStatements.length) await db.batch(valueStatements);
 
-  const ipHash = await hashIp(c.req.raw);
-  await db
-    .prepare(
-      `UPDATE recipients SET status = 'signed', signed_at = ?, ip_hash = ?, user_agent = ? WHERE id = ?`
+    const ipHash = await hashIp(c.req.raw);
+    await db.prepare(
+      `UPDATE recipients SET status = 'signed', signed_at = ?, ip_hash = ?, user_agent = ? WHERE id = ? AND status = 'signing'`
     )
     .bind(nowIso(), ipHash, c.req.header("User-Agent") || "", recipient.id)
     .run();
+  } catch (error) {
+    await db.prepare(`UPDATE recipients SET status = 'viewed' WHERE id = ? AND status = 'signing'`).bind(recipient.id).run().catch(() => {});
+    throw error;
+  }
   await logEvent(db, envelope.id, recipient.id, "signed", "");
   await sendSignedNotice(c.env, { envelope, recipient });
 
@@ -335,6 +429,11 @@ app.post("/share-target", (c) => c.redirect("/?share=1", 303));
 // already serves every real static file in ./public before the Worker ever runs
 // (see the [assets] block in wrangler.toml), so we don't need a manual fallback here.
 app.notFound((c) => jsonError("Not found", 404));
+app.onError((error, c) => {
+  if (error instanceof ValidationError) return jsonError(error.message, error.status);
+  console.error("Unhandled request error", error);
+  return jsonError("Something went wrong. Please try again.", 500);
+});
 
 // -----------------------------------------------------------------------------
 // Shared helpers
@@ -388,12 +487,25 @@ async function sendToNextGroup(env, envelopeId, { justCreated } = {}) {
   const allSigned = signers.every((r) => r.status === "signed");
 
   if (allSigned) {
-    await completeEnvelope(env, envelope, recipients);
-    return;
+    const claim = await db.prepare(
+      `UPDATE envelopes SET status = 'completing'
+       WHERE id = ? AND status NOT IN ('completing', 'completed', 'voided', 'declined')`
+    ).bind(envelopeId).run();
+    if (claim.meta.changes !== 1) return { notifiedCount: 0, failedCount: 0, completed: envelope.status === "completed" };
+    try {
+      await completeEnvelope(env, envelope, recipients);
+      return { notifiedCount: 0, failedCount: 0, completed: true };
+    } catch (error) {
+      await db.prepare(`UPDATE envelopes SET status = 'partially_signed' WHERE id = ? AND status = 'completing'`).bind(envelopeId).run().catch(() => {});
+      await logEvent(db, envelopeId, null, "completion_failed", String(error?.message || error).slice(0, 500)).catch(() => {});
+      throw error;
+    }
   }
 
   const pendingSigners = signers.filter((r) => r.status !== "signed" && r.status !== "declined");
-  if (!pendingSigners.length) return;
+  if (!pendingSigners.length || ["completed", "voided", "declined", "completing"].includes(envelope.status)) {
+    return { notifiedCount: 0, failedCount: 0 };
+  }
   const nextOrder = Math.min(...pendingSigners.map((r) => r.sign_order));
   const dueNow = pendingSigners.filter((r) => r.sign_order === nextOrder && (justCreated ? true : r.status === "pending"));
 
@@ -403,24 +515,34 @@ async function sendToNextGroup(env, envelopeId, { justCreated } = {}) {
     ? recipients.filter((r) => r.role !== "cc" && r.sign_order === nextOrder)
     : dueNow.filter((r) => r.status === "pending");
 
+  let notifiedCount = 0;
+  let failedCount = 0;
   for (const recipient of toNotify) {
     const signUrl = `${env.APP_URL}/sign?t=${recipient.token}`;
-    await sendSigningInvite(env, { envelope, recipient, signUrl });
-    await db
-      .prepare(`UPDATE recipients SET status = 'notified', notified_at = ? WHERE id = ?`)
-      .bind(nowIso(), recipient.id)
-      .run();
-    await logEvent(db, envelopeId, recipient.id, "sent", `order ${recipient.sign_order}`);
+    const delivery = await sendSigningInvite(env, { envelope, recipient, signUrl });
+    if (delivery?.ok) {
+      notifiedCount++;
+      await db
+        .prepare(`UPDATE recipients SET status = 'notified', notified_at = ? WHERE id = ? AND status = 'pending'`)
+        .bind(nowIso(), recipient.id)
+        .run();
+      await logEvent(db, envelopeId, recipient.id, "sent", `order ${recipient.sign_order}`);
+    } else {
+      failedCount++;
+      await logEvent(db, envelopeId, recipient.id, "delivery_failed", `invite, order ${recipient.sign_order}`);
+    }
   }
 
+  const deliveryStatus = failedCount ? (notifiedCount ? "delivery_partial" : "delivery_failed") : (justCreated ? "sent" : "partially_signed");
   if (justCreated) {
     await db
-      .prepare(`UPDATE envelopes SET status = 'sent', sent_at = ? WHERE id = ?`)
-      .bind(nowIso(), envelopeId)
+      .prepare(`UPDATE envelopes SET status = ?, sent_at = ? WHERE id = ?`)
+      .bind(deliveryStatus, notifiedCount ? nowIso() : null, envelopeId)
       .run();
   } else {
-    await db.prepare(`UPDATE envelopes SET status = 'partially_signed' WHERE id = ?`).bind(envelopeId).run();
+    await db.prepare(`UPDATE envelopes SET status = ? WHERE id = ?`).bind(deliveryStatus, envelopeId).run();
   }
+  return { notifiedCount, failedCount };
 }
 
 async function completeEnvelope(env, envelope, recipients) {
@@ -467,10 +589,12 @@ async function completeEnvelope(env, envelope, recipients) {
   for (const r of recipients) {
     if (!r.email || sent.has(r.email)) continue;
     sent.add(r.email);
-    await sendCompletedPacket(env, { envelope, downloadUrl: finalUrl(r.token), to: r.email });
+    const delivery = await sendCompletedPacket(env, { envelope, downloadUrl: finalUrl(r.token), to: r.email });
+    if (!delivery?.ok) await logEvent(db, envelope.id, r.id, "delivery_failed", "completed packet");
   }
   if (envelope.sender_email && !sent.has(envelope.sender_email)) {
-    await sendCompletedPacket(env, { envelope, downloadUrl: finalUrl(recipients[0]?.token || ""), to: envelope.sender_email });
+    const delivery = await sendCompletedPacket(env, { envelope, downloadUrl: finalUrl(recipients[0]?.token || ""), to: envelope.sender_email });
+    if (!delivery?.ok) await logEvent(db, envelope.id, null, "delivery_failed", "sender completed packet");
   }
 }
 

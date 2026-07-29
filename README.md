@@ -1,7 +1,8 @@
 # Signet
 
-A self-hosted PDF toolkit + e-signature app — the DocuSign-style piece you asked for, kept
-separate from Yardstick. Runs entirely on your own Cloudflare account.
+A browser-first PDF editor with an optional self-hosted e-signature workflow. Editing is the
+main product; signature requests are a secondary tool. The hosted pieces run on your own
+Cloudflare account.
 
 - **PDF editor** — an Adobe-style 3-pane editor (tool rail, page thumbnails, zoomable canvas,
   contextual properties panel). Type text **directly on the page**, draw freehand, drop
@@ -32,6 +33,27 @@ Cloudflare D1      (schema.sql)        — envelopes, recipients, fields, values
 Cloudflare R2                          — stores original + completed PDFs
 Resend                                 — sends the invite / notification / completed emails
 ```
+
+## Useful agents (editor-first roadmap)
+
+Agents should propose visible document changes, not become a generic chat panel. The highest
+value order is:
+
+1. **Document QA agent** — scans for clipped content, blank pages, inconsistent page sizes,
+   missing form values, and likely OCR errors. It returns a page-linked checklist.
+2. **Redaction assistant** — suggests names, addresses, account numbers, and other sensitive
+   regions, but never applies or flattens a redaction without the user's explicit confirmation.
+3. **Form builder agent** — detects likely fields and proposes text, checkbox, date, and
+   signature boxes. The user reviews the overlays before anything is added.
+4. **Batch cleanup agent** — applies a confirmed recipe (rotate, crop, OCR, watermark, page
+   numbering, compression) across several open PDFs and reports exceptions.
+
+Implement these behind one typed proposal format: every proposal names a document, page,
+operation, normalized coordinates, confidence, and explanation. Render proposals as overlays
+and a diff/checklist; only an explicit **Apply** action may modify the PDF. Keep deterministic
+operations in the browser. If a model is later added, make cloud analysis opt-in and send only
+the minimum extracted text or page images needed for the selected task. This keeps the editor
+useful without handing an autonomous agent irreversible document or sending authority.
 
 Nothing here needs a server you manage — it's all Cloudflare's edge platform, so cost at your
 volume will be effectively $0/month (Workers, D1, and R2 all have generous free tiers; Resend's
@@ -128,6 +150,7 @@ Two things auto-deploy does **not** do:
 ## Day-to-day
 
 - `npm run dev` — run locally against a local D1/R2 simulation for testing changes.
+- `npm test` — run the payload and field-validation test suite.
 - `npm run deploy` — ship changes manually (rarely needed now that pushes to `main` auto-deploy).
 - `npm run tail` — live-stream logs from the deployed Worker (handy if an email doesn't send).
 - Schema changes: edit `schema.sql`, then re-run the relevant migrate command. D1 doesn't

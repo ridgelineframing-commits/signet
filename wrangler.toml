@@ -1,7 +1,34 @@
 name = "signet"
 main = "worker/index.js"
-compatibility_date = "2024-11-01"
+compatibility_date = "2026-07-29"
 compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[ratelimits]]
+name = "AUTH_RATE_LIMITER"
+namespace_id = "731001"
+
+[ratelimits.simple]
+limit = 10
+period = 60
+
+[[ratelimits]]
+name = "OTP_RATE_LIMITER"
+namespace_id = "731002"
+
+[ratelimits.simple]
+limit = 5
+period = 60
+
+[[ratelimits]]
+name = "OTP_VERIFY_RATE_LIMITER"
+namespace_id = "731003"
+
+[ratelimits.simple]
+limit = 10
+period = 60
 
 # ---- Static frontend ----
 # Cloudflare serves any request that matches a file in ./public directly (no Worker

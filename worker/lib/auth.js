@@ -16,22 +16,39 @@ async function hmac(secret, message) {
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+async function fixedDigest(value) {
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(value ?? "")));
+}
+
+export async function timingSafeStringEqual(provided, expected) {
+  const [providedHash, expectedHash] = await Promise.all([fixedDigest(provided), fixedDigest(expected)]);
+  return crypto.subtle.timingSafeEqual(providedHash, expectedHash);
+}
+
+function sessionSecret(env) {
+  // Binding the password into the signing key means rotating ADMIN_PASSWORD also
+  // invalidates every previously-issued session without another piece of state.
+  return `${env.SESSION_SECRET || ""}\u0000${env.ADMIN_PASSWORD || ""}`;
+}
+
 export async function issueSession(env) {
+  if (!env.SESSION_SECRET || !env.ADMIN_PASSWORD) throw new Error("Admin authentication is not configured");
   const issuedAt = Date.now();
   const payload = `${issuedAt}`;
-  const sig = await hmac(env.SESSION_SECRET, payload);
+  const sig = await hmac(sessionSecret(env), payload);
   return `${payload}.${sig}`;
 }
 
 export async function verifySession(env, token) {
+  if (!env.SESSION_SECRET || !env.ADMIN_PASSWORD) return false;
   if (!token) return false;
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return false;
-  const expected = await hmac(env.SESSION_SECRET, payload);
-  if (expected !== sig) return false;
+  const expected = await hmac(sessionSecret(env), payload);
+  if (!(await timingSafeStringEqual(sig, expected))) return false;
   const issuedAt = Number(payload);
   const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
-  return Date.now() - issuedAt < THIRTY_DAYS;
+  return Number.isFinite(issuedAt) && issuedAt <= Date.now() && Date.now() - issuedAt < THIRTY_DAYS;
 }
 
 export function getBearer(request) {

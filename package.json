@@ -2,8 +2,10 @@
   "name": "signet",
   "version": "1.0.0",
   "private": true,
-  "description": "Self-hosted PDF toolkit + e-signature (DocuSign-style) app on Cloudflare Workers, D1, R2, and Resend.",
+  "type": "module",
+  "description": "Browser-first PDF editor with optional self-hosted e-signature workflows on Cloudflare Workers, D1, R2, and Resend.",
   "scripts": {
+    "test": "node --test",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 execute signet-db --file=./schema.sql --remote",
