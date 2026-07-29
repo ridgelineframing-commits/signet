@@ -101,6 +101,103 @@ const TOOL_LABELS = {
 
 function hasDoc() { return !!tk.pdfDoc && tk.order.length > 0; }
 
+// ---------------------------------------------------------------- tabs: multiple open PDFs
+// The active document's live state stays in `tk`. Other open docs are snapshots in openDocs.
+// Switching snapshots `tk` into the current slot and loads the target slot into `tk`.
+let openDocs = [];
+let activeTab = -1;
+const DOC_FIELDS = ["pdfDoc", "order", "annos", "fileName", "currentPage", "zoom", "_renderDoc", "_renderDirty", "_pageDims", "selectedAnno", "activeText"];
+function captureDoc() { const s = {}; for (const k of DOC_FIELDS) s[k] = tk[k]; s.undoStack = undoStack; s.redoStack = redoStack; return s; }
+function applyDoc(s) { for (const k of DOC_FIELDS) tk[k] = s[k]; undoStack = s.undoStack; redoStack = s.redoStack; }
+function blankDocState() { return { pdfDoc: null, order: [], annos: [], fileName: "", currentPage: 0, zoom: 100, _renderDoc: null, _renderDirty: true, _pageDims: null, selectedAnno: null, activeText: null, undoStack: [], redoStack: [] }; }
+function syncActive() { if (activeTab >= 0 && activeTab < openDocs.length) openDocs[activeTab] = captureDoc(); }
+function refreshDocChrome() {
+  const has = hasDoc();
+  $("emptyState").hidden = has;
+  $("pageShell").hidden = !has;
+  $("pageNav").hidden = !has;
+  $("propsPanel").hidden = !has;
+  $("downloadBtn").disabled = !has;
+  $("requestSigBtn").disabled = !has;
+  $("addPagesBtn").hidden = !has;
+  $("pagesToggle").hidden = !has;
+  $("docTitleLbl").textContent = has ? (tk.fileName || "Untitled document") : "No document loaded";
+  $("pageCountChip").hidden = !has;
+}
+function renderTabs() {
+  syncActive();
+  const bar = $("tabBar");
+  if (!openDocs.length) { bar.hidden = true; bar.innerHTML = ""; return; }
+  bar.hidden = false; bar.innerHTML = "";
+  openDocs.forEach((d, i) => {
+    const t = document.createElement("div");
+    t.className = "tab" + (i === activeTab ? " active" : "");
+    t.title = d.fileName || "Untitled";
+    const nm = document.createElement("span"); nm.className = "tabname"; nm.textContent = d.fileName || "Untitled";
+    const x = document.createElement("button"); x.className = "tabx"; x.innerHTML = "&times;"; x.title = "Close tab";
+    x.onclick = (e) => { e.stopPropagation(); closeTab(i); };
+    t.append(nm, x);
+    t.onclick = () => switchToTab(i);
+    bar.appendChild(t);
+  });
+  const add = document.createElement("button");
+  add.className = "tabadd"; add.innerHTML = "&plus;"; add.title = "Open another PDF";
+  add.onclick = () => $("fileInput").click();
+  bar.appendChild(add);
+}
+function switchToTab(i) {
+  if (i === activeTab || i < 0 || i >= openDocs.length) return;
+  syncActive();
+  activeTab = i;
+  applyDoc(openDocs[i]);
+  tk.placeArmed = false;
+  refreshDocChrome(); renderTabs(); fullRerender(); applyZoom(); renderPropsPanel();
+}
+function closeTab(i) {
+  if (i < 0 || i >= openDocs.length) return;
+  openDocs.splice(i, 1);
+  if (i < activeTab) activeTab--;
+  if (!openDocs.length) {
+    activeTab = -1; applyDoc(blankDocState());
+    invalidateRender(); $("pageShell").innerHTML = ""; $("thumbList").innerHTML = "";
+    refreshDocChrome(); renderTabs(); renderPropsPanel(); return;
+  }
+  if (activeTab >= openDocs.length) activeTab = openDocs.length - 1;
+  if (activeTab < 0) activeTab = 0;
+  applyDoc(openDocs[activeTab]);
+  refreshDocChrome(); renderTabs(); fullRerender(); applyZoom(); renderPropsPanel();
+}
+function newBlankTab() { syncActive(); openDocs.push(blankDocState()); activeTab = openDocs.length - 1; applyDoc(openDocs[activeTab]); }
+async function openInNewTab(files) {
+  if (hasDoc()) newBlankTab();
+  else if (activeTab < 0) { openDocs.push(blankDocState()); activeTab = 0; applyDoc(openDocs[0]); }
+  const ok = await loadFiles(files, true);
+  if (!ok && !hasDoc()) closeTab(activeTab); // drop the empty tab we just opened
+  else { syncActive(); renderTabs(); }
+  return ok;
+}
+async function mergeOpenDocs() {
+  syncActive();
+  const real = openDocs.filter((d) => d.pdfDoc && d.order.length);
+  if (real.length < 2) return toast("Open at least two PDFs (in separate tabs) to merge them.", "error");
+  toast("Merging…");
+  const savedTab = activeTab;
+  const merged = await PDFDocument.create();
+  for (let i = 0; i < openDocs.length; i++) {
+    const d = openDocs[i]; if (!(d.pdfDoc && d.order.length)) continue;
+    activeTab = i; applyDoc(d);
+    const bytes = await bakeAndExport();
+    const src = await PDFDocument.load(bytes, { ignoreEncryption: true });
+    (await merged.copyPages(src, src.getPageIndices())).forEach((p) => merged.addPage(p));
+  }
+  activeTab = savedTab; if (activeTab >= 0) applyDoc(openDocs[activeTab]);
+  const mergedBytes = await merged.save();
+  newBlankTab();
+  await loadFiles([new File([mergedBytes], "Merged.pdf", { type: "application/pdf" })], true);
+  syncActive(); renderTabs();
+  toast(`Merged ${real.length} PDFs into a new tab.`, "success");
+}
+
 // ------------------------------------------------------------- open non-PDF files as PDF
 // Everything that enters the editor flows through loadFiles(). Images (.jpg/.png/…),
 // plain text (.txt/.md/.csv), and Word (.docx) are converted to a PDF here first, so a
@@ -220,23 +317,15 @@ async function loadFiles(files, replacing) {
     } catch (e) { toast(`Couldn't load ${s.name}: ${e?.message || "bad PDF"}`, "error"); }
   }
   if (!tk.order.length) return false;
-  $("emptyState").hidden = true;
-  $("pageShell").hidden = false;
-  $("pageNav").hidden = false;
-  $("propsPanel").hidden = false;
-  $("downloadBtn").disabled = false;
-  $("requestSigBtn").disabled = false;
-  $("addPagesBtn").hidden = false;
-  $("pagesToggle").hidden = false;
-  $("docTitleLbl").textContent = tk.fileName || "Untitled document";
-  $("pageCountChip").hidden = false;
+  refreshDocChrome();
   invalidateRender();
   await fullRerender();
+  renderTabs();
   return true;
 }
 
-$("fileInput").onchange = async (e) => { const files = [...e.target.files]; if (files.length) await loadFiles(files, true); };
-$("addPagesInput").onchange = async (e) => { const files = [...e.target.files]; if (files.length) await loadFiles(files, false); };
+$("fileInput").onchange = async (e) => { const files = [...e.target.files]; if (files.length) await openInNewTab(files); e.target.value = ""; };
+$("addPagesInput").onchange = async (e) => { const files = [...e.target.files]; if (files.length) await loadFiles(files, false); e.target.value = ""; };
 $("addPagesBtn").onclick = () => $("addPagesInput").click();
 
 window.addEventListener("dragover", (e) => e.preventDefault());
@@ -246,7 +335,7 @@ const emptyState = $("emptyState");
 ["dragleave", "drop"].forEach((evt) => emptyState.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); emptyState.classList.remove("dragover"); }));
 emptyState.addEventListener("drop", async (e) => {
   const files = [...e.dataTransfer.files].filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
-  if (files.length) await loadFiles(files, true);
+  if (files.length) await openInNewTab(files);
 });
 // also allow dropping a new doc onto the canvas area generally (adds pages)
 $("canvasScroll").addEventListener("drop", async (e) => {
@@ -265,7 +354,7 @@ async function loadLaunchFiles(fileHandles) {
     try { files.push(await h.getFile()); } catch { /* permission or revoked handle */ }
   }
   if (!files.length) { toast("Signet opened to handle a file but couldn't read it.", "error"); return; }
-  const ok = await loadFiles(files, true); // loadFiles toasts its own per-file problems
+  const ok = await openInNewTab(files); // loadFiles toasts its own per-file problems
   if (ok) toast(`Opened ${files[0].name}`, "success");
 }
 if ("launchQueue" in window && "setConsumer" in window.launchQueue) {
@@ -283,7 +372,7 @@ async function consumeSharedFile() {
     const blob = await res.blob();
     const name = res.headers.get("x-filename") || "shared.pdf";
     const type = res.headers.get("content-type") || "";
-    const ok = await loadFiles([new File([blob], name, { type })], true);
+    const ok = await openInNewTab([new File([blob], name, { type })]);
     if (ok) toast(`Opened ${name}`, "success");
   } catch { /* nothing shared */ }
 }
@@ -454,8 +543,13 @@ function runMenuAct(act) {
     undo, redo, copy: copySelected, paste: pasteClip, duplicate: duplicateSelected, delete: deleteSelected,
     zoomin: () => setZoom(tk.zoom + 10), zoomout: () => setZoom(tk.zoom - 10), zoomreset: () => setZoom(100), zoomfit: zoomFit,
     togglePages: () => $("togglePages").click(),
+    shortcuts: () => { $("helpModalBack").hidden = false; },
+    tutorial: () => toast("Tutorial coming soon — it's on the way!"),
+    merge: () => mergeOpenDocs(),
   }[act] || (() => {}))();
 }
+$("helpClose").onclick = () => ($("helpModalBack").hidden = true);
+$("helpModalBack").onclick = (e) => { if (e.target === $("helpModalBack")) $("helpModalBack").hidden = true; };
 document.querySelectorAll("#menuBar [data-tool], #menuBar [data-act]").forEach((el) => {
   el.addEventListener("click", (e) => {
     e.stopPropagation(); closeMenus();
@@ -486,13 +580,10 @@ function loadPanelPrefs() { try { return JSON.parse(localStorage.getItem(PANELS_
 function applyPanelPrefs() {
   const p = loadPanelPrefs();
   document.body.classList.toggle("thumbs-collapsed", !!p.thumbsCollapsed);
-  document.body.classList.toggle("props-collapsed", !!p.propsCollapsed);
   $("togglePages").classList.toggle("on", !p.thumbsCollapsed);
-  $("toggleProps").classList.toggle("on", !p.propsCollapsed);
 }
 function setPanelPref(key, val) { const p = loadPanelPrefs(); p[key] = val; try { localStorage.setItem(PANELS_KEY, JSON.stringify(p)); } catch {} applyPanelPrefs(); }
 $("togglePages").onclick = () => setPanelPref("thumbsCollapsed", !document.body.classList.contains("thumbs-collapsed"));
-$("toggleProps").onclick = () => setPanelPref("propsCollapsed", !document.body.classList.contains("props-collapsed"));
 applyPanelPrefs();
 
 // ---------------------------------------------------------------- selection, undo/redo, clipboard, keys
@@ -1031,7 +1122,7 @@ function renderPropsPanel() {
   const builders = { select: buildSelectPanel, hand: buildHandPanel, text: buildTextPanel, edittext: buildEditTextPanel, signature: buildSigPanel, draw: buildDrawPanel, shape: buildShapePanel, highlight: buildHighlightPanel, image: buildImagePanel, redact: buildRedactPanel, watermark: buildWatermarkPanel, pagenum: buildPagenumPanel, organize: buildOrganizePanel };
   (builders[tk.tool] || buildSelectPanel)(body);
 }
-function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Click an element to select it, then drag to move or drag the corner to resize. Double-click text to edit it.<br><br><strong>Keyboard:</strong> Ctrl/⌘+Z undo · Ctrl/⌘+Y redo · Ctrl/⌘+C copy · Ctrl/⌘+V paste · Ctrl/⌘+D duplicate · Delete removes · Esc deselects.</div>'; }
+function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Click an element to select it, then drag to move, or drag the corner to resize. Double-click text to edit. Keyboard shortcuts are in the <strong>Help</strong> menu.</div>'; }
 function buildHandPanel(body) { body.innerHTML = '<p class="hint">Drag anywhere on the page to pan around. Handy when zoomed in. This tool never changes the document.</p>'; }
 
 function buildEditTextPanel(body) {
