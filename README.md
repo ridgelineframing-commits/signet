@@ -163,6 +163,26 @@ Signet is a PWA, so on any device it can be installed and registered as a PDF ha
 open a PDF from your file manager / email and it launches straight into the editor, no
 browser chrome.
 
+### Windows installer
+
+The `desktop/` wrapper packages the hosted editor as a locked-down Electron application. It
+disables Node.js access in the remote page, enables renderer sandboxing and context isolation,
+denies browser permission requests and popups, and blocks navigation away from the configured
+Signet origin.
+
+```powershell
+npm install
+npm run desktop:make
+```
+
+The no-admin installer is written to:
+
+`out/make/squirrel.windows/x64/Signet-PDF-Editor-Setup.exe`
+
+The installer is unsigned unless a Windows code-signing certificate is added to the Squirrel
+maker configuration. An unsigned build still installs, but Windows SmartScreen may identify it
+as coming from an unknown publisher.
+
 - **Desktop (Chrome/Edge) & ChromeOS:** visit the site, install it (the install icon in the
   address bar, or ⋮ → *Install Signet*). Once installed it registers as a `.pdf` handler and
   appears in the OS "Open with" list. You can also *share* a PDF to it.
