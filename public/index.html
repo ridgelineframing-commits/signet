@@ -150,6 +150,13 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 .toast.success{background:#17936a;}
 .toast.error{background:var(--bad);}
 
+/* new logo mark — PDF with a hand dragging the F; PD + hand use currentColor so it
+   adapts to light (header/empty-state) and dark (login) backgrounds; F stays gradient */
+.pdflogo{display:block;height:auto;}
+.brand .pdflogo{height:26px;color:var(--ink);}
+#loginScreen .pdflogo{height:64px;color:#fff;}
+.empty-state .pdflogo{height:72px;color:var(--ink);margin:0 auto 8px;}
+
 /* responsive helpers */
 .mobile-only{display:none !important;}
 .scrim{position:fixed;inset:0;background:rgba(18,20,28,.42);z-index:24;}
@@ -190,6 +197,23 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 .menubar .quicktool:hover{background:var(--chip);}
 .menubar .quicktool.active{background:var(--grad);color:#fff;border-color:transparent;box-shadow:0 1px 4px rgba(106,76,240,.3);}
 #ribbonScrim{z-index:54;}
+
+/* ---- Browser-style tabs (one per open PDF) ---- */
+.tabbar{display:flex;align-items:flex-end;gap:3px;height:38px;flex:0 0 38px;padding:0 8px;
+  background:var(--bg);border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden;z-index:18;
+  -webkit-overflow-scrolling:touch;scrollbar-width:thin;}
+.tabbar .tab{display:flex;align-items:center;gap:8px;max-width:220px;height:30px;padding:0 6px 0 13px;
+  background:#e4e3e9;border:1px solid var(--line2);border-bottom:none;border-radius:9px 9px 0 0;
+  color:var(--sub);font-size:12.5px;font-weight:600;cursor:pointer;flex:0 1 auto;min-width:96px;white-space:nowrap;}
+.tabbar .tab:hover{background:#eeedf2;}
+.tabbar .tab.active{background:#fff;color:var(--ink);border-color:var(--line);box-shadow:0 -1px 4px rgba(20,22,30,.05);}
+.tabbar .tabname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tabbar .tabx{flex:0 0 auto;width:19px;height:19px;display:flex;align-items:center;justify-content:center;
+  border:none;background:none;color:var(--sub2);font-size:16px;line-height:1;border-radius:5px;cursor:pointer;}
+.tabbar .tabx:hover{background:rgba(20,22,30,.12);color:var(--ink);}
+.tabbar .tabadd{flex:0 0 auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  border:none;background:none;color:var(--sub);font-size:20px;line-height:1;border-radius:8px;cursor:pointer;margin-left:2px;}
+.tabbar .tabadd:hover{background:rgba(20,22,30,.08);color:var(--ink);}
 
 @media (min-width:821px){
   nav.rail{display:none;}                       /* tools now live in the header menus */
@@ -284,7 +308,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 <body>
 
 <div id="loginScreen" hidden>
-  <div class="logomark big"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M26 14 h30 l14 14 v58 a4 4 0 0 1 -4 4 H26 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" fill="#fff"/><path d="M56 14 v14 h14" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="4" stroke-linejoin="round"/><path d="M46 60 v-16 M39 44 h14 M39 60 h14" fill="none" stroke="#6A4CF0" stroke-width="5" stroke-linecap="round"/></svg></div>
+  <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><linearGradient id="plg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient><text x="6" y="86" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="currentColor">PD</text><g transform="translate(196 28) rotate(13)"><text x="0" y="60" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="url(#plg2)">F</text></g><g transform="translate(236 12) rotate(13) scale(.82)" fill="currentColor"><path d="M6 20 a20 20 0 0 1 40 0 v18 a10 10 0 0 1 -10 10 h-24 a12 12 0 0 1 -12 -12 z"/><path d="M6 26 q-12 2 -12 14 q0 8 9 9" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></g></svg>
   <div class="box">
     <button id="loginCancel" title="Close" aria-label="Close">&times;</button>
     <h1>Signet<span style="color:var(--accent)">.</span></h1>
@@ -299,7 +323,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   <header class="topbar">
     <button class="icon-btn mobile-only" id="pagesToggle" title="Pages" hidden>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg></button>
-    <div class="brand"><span class="logomark hdr"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M26 14 h30 l14 14 v58 a4 4 0 0 1 -4 4 H26 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" fill="#fff"/><path d="M56 14 v14 h14" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="4" stroke-linejoin="round"/><path d="M46 60 v-16 M39 44 h14 M39 60 h14" fill="none" stroke="#6A4CF0" stroke-width="5" stroke-linecap="round"/></svg></span>Signet<span>.</span></div>
+    <div class="brand"><svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Signet"><linearGradient id="plg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient><text x="6" y="86" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="currentColor">PD</text><g transform="translate(196 28) rotate(13)"><text x="0" y="60" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="url(#plg)">F</text></g><g transform="translate(236 12) rotate(13) scale(.82)" fill="currentColor"><path d="M6 20 a20 20 0 0 1 40 0 v18 a10 10 0 0 1 -10 10 h-24 a12 12 0 0 1 -12 -12 z"/><path d="M6 26 q-12 2 -12 14 q0 8 9 9" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></g></svg><span class="desktop-only" style="font-size:19px;font-weight:700;letter-spacing:-.01em">Signet<span style="color:var(--accent)">.</span></span></div>
     <div class="vdiv desktop-only"></div>
     <div class="row desktop-only" style="min-width:0">
       <span class="doctitle" id="docTitleLbl">No document loaded</span>
@@ -308,12 +332,12 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <div class="vdiv desktop-only"></div>
     <button class="icon-btn desktop-only on" id="togglePages" title="Show / hide the Pages panel" aria-label="Toggle Pages panel">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="16" rx="1"/><path d="M14.5 5h5M14.5 9.5h5M14.5 14h5M14.5 18.5h3.5"/></svg></button>
-    <button class="icon-btn desktop-only on" id="toggleProps" title="Show / hide the info panel" aria-label="Toggle info panel">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M15 4.5v15"/></svg></button>
     <div class="spacer"></div>
-    <button class="btn" id="openEnvelopesBtn"><span class="desktop-only">Requests</span><span class="mobile-only" aria-label="Requests">&#128233;</span></button>
-    <button class="icon-btn" id="downloadBtn" title="Download" disabled>&#8681;</button>
-    <button class="btn primary" id="requestSigBtn" disabled><span class="desktop-only">Send for signature</span><span class="mobile-only">Send</span></button>
+    <!-- These duplicate the File menu on desktop, so they show only on mobile (no menu bar there).
+         Their handlers stay wired; the File menu triggers them via .click(). -->
+    <button class="btn mobile-only" id="openEnvelopesBtn"><span class="mobile-only" aria-label="Requests">&#128233;</span></button>
+    <button class="icon-btn mobile-only" id="downloadBtn" title="Download" disabled>&#8681;</button>
+    <button class="btn primary mobile-only" id="requestSigBtn" disabled><span class="mobile-only">Send</span></button>
   </header>
 
   <!-- Word-style menu bar (wide screens only; phones/tablets keep the bottom tool bar) -->
@@ -321,6 +345,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <div class="menu" data-menu="file"><button class="menutop">File</button><div class="menupop">
       <button class="mi" data-act="open">Open…</button>
       <button class="mi" data-act="addpages">Add pages…</button>
+      <button class="mi" data-act="merge">Merge open PDFs</button>
       <div class="misep"></div>
       <button class="mi" data-act="download">Download</button>
       <button class="mi" data-act="send">Send for signature</button>
@@ -364,6 +389,10 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
       <div class="misep"></div>
       <button class="mi" data-act="togglePages">Show / hide Pages panel</button>
     </div></div>
+    <div class="menu" data-menu="help"><button class="menutop">Help</button><div class="menupop">
+      <button class="mi" data-act="shortcuts">Keyboard shortcuts</button>
+      <button class="mi" data-act="tutorial">Tutorial <span class="kbd">soon</span></button>
+    </div></div>
 
     <div class="spacer"></div>
 
@@ -375,6 +404,9 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <button class="quicktool active" data-tool="select" title="Select">Select</button>
     <button class="quicktool" data-tool="hand" title="Pan">Pan</button>
   </div>
+
+  <!-- Browser-style tabs: one per open PDF. Hidden until a document is loaded. -->
+  <div class="tabbar" id="tabBar" hidden></div>
 
   <!-- Contextual ribbon: the active tool's options (relocated from the old right panel). -->
   <div class="scrim" id="ribbonScrim" hidden></div>
@@ -430,7 +462,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <div class="canvaswrap">
       <div class="canvasscroll" id="canvasScroll">
         <div class="empty-state" id="emptyState">
-          <div class="logomark big" style="margin:0 auto 4px"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M26 14 h30 l14 14 v58 a4 4 0 0 1 -4 4 H26 a4 4 0 0 1 -4 -4 V18 a4 4 0 0 1 4 -4 Z" fill="#fff"/><path d="M56 14 v14 h14" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="4" stroke-linejoin="round"/><path d="M46 60 v-16 M39 44 h14 M39 60 h14" fill="none" stroke="#6A4CF0" stroke-width="5" stroke-linecap="round"/></svg></div>
+          <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><linearGradient id="plg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7C5CFF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient><text x="6" y="86" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="currentColor">PD</text><g transform="translate(196 28) rotate(13)"><text x="0" y="60" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="86" letter-spacing="-3" fill="url(#plg3)">F</text></g><g transform="translate(236 12) rotate(13) scale(.82)" fill="currentColor"><path d="M6 20 a20 20 0 0 1 40 0 v18 a10 10 0 0 1 -10 10 h-24 a12 12 0 0 1 -12 -12 z"/><path d="M6 26 q-12 2 -12 14 q0 8 9 9" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/></g></svg>
           <h2>Drop a PDF, image, or Word file here</h2>
           <p>...or click to browse. PDFs, JPG/PNG images, .txt and .docx all open here — pick several to merge them in order.</p>
           <input type="file" id="fileInput" accept=".pdf,application/pdf,image/*,.txt,.md,.csv,text/plain,.docx" multiple />
@@ -441,10 +473,10 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
         <button id="pnPrev" title="Previous page">&#8592;</button>
         <div class="plabel" id="pnLabel">1 / 1</div>
         <button id="pnNext" title="Next page">&#8594;</button>
-        <div class="vdiv"></div>
-        <button id="pnZoomOut" title="Zoom out">&#8722;</button>
-        <button class="zlabel" id="pnZoomReset" title="Reset zoom">100%</button>
-        <button id="pnZoomIn" title="Zoom in">&#43;</button>
+        <div class="vdiv mobile-only"></div>
+        <button class="mobile-only" id="pnZoomOut" title="Zoom out">&#8722;</button>
+        <button class="zlabel mobile-only" id="pnZoomReset" title="Reset zoom">100%</button>
+        <button class="mobile-only" id="pnZoomIn" title="Zoom in">&#43;</button>
       </div>
     </div>
   </div>
@@ -493,6 +525,25 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
       <div class="hint" id="envEmpty" hidden>No envelopes yet — this is a small side tool. Use "Send for signature" from the editor when you actually need someone to sign something.</div>
       <div id="envCards"></div>
       <div id="envDetailCard" style="margin-top:14px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modalback" id="helpModalBack" hidden>
+  <div class="modal">
+    <div class="modal-head"><div class="t">Keyboard shortcuts</div><button class="closex" id="helpClose">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="hint" style="line-height:2">
+        <strong>Ctrl / &#8984; + Z</strong> &mdash; Undo<br>
+        <strong>Ctrl / &#8984; + Y</strong> (or Shift+Z) &mdash; Redo<br>
+        <strong>Ctrl / &#8984; + C</strong> &mdash; Copy the selected element<br>
+        <strong>Ctrl / &#8984; + V</strong> &mdash; Paste<br>
+        <strong>Ctrl / &#8984; + D</strong> &mdash; Duplicate / stamp the selection<br>
+        <strong>Delete / Backspace</strong> &mdash; Remove the selection<br>
+        <strong>Esc</strong> &mdash; Deselect<br>
+        <strong>Shift</strong> while drawing &mdash; Straight line
+      </div>
+      <p class="hint" style="margin-top:14px;color:var(--sub3)">Pick the Select tool, click an element, then use these. An interactive tutorial is coming soon.</p>
     </div>
   </div>
 </div>
