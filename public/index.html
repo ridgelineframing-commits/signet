@@ -188,11 +188,13 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 .sigsaved .sigthumb img{max-height:38px;max-width:132px;display:block;pointer-events:none;}
 .sigsaved .sigthumb .x{top:-7px;right:-7px;}
 
-/* ---- Word-style menu bar + contextual ribbon (wide screens) ---- */
-.menubar{display:flex;align-items:center;gap:2px;height:40px;flex:0 0 40px;padding:0 10px;background:#fff;border-bottom:1px solid var(--line);z-index:19;}
+/* ---- Word-style tabs + command ribbon (wide screens) ---- */
+.menubar{display:flex;align-items:flex-end;gap:1px;height:38px;flex:0 0 38px;padding:0 12px;background:#fff;border-bottom:1px solid var(--line);z-index:21;}
 .menubar .menu{position:relative;}
-.menubar .menutop{border:none;background:transparent;color:var(--ink2);font-size:13px;font-weight:600;padding:6px 11px;border-radius:7px;}
-.menubar .menutop:hover,.menubar .menu.open .menutop{background:var(--chip);}
+.menubar .menu:not([data-menu="file"]),.menubar .zoomgroup,.menubar .quicktool{display:none;}
+.menubar .menutop,.menubar .ribbontab{height:37px;border:none;border-bottom:3px solid transparent;background:transparent;color:var(--ink2);font-size:13px;font-weight:600;padding:3px 13px 0;}
+.menubar .menutop:hover,.menubar .menu.open .menutop,.menubar .ribbontab:hover{background:#f6f6f8;}
+.menubar .ribbontab.active{color:var(--accent);border-bottom-color:var(--accent);background:#faf9ff;}
 .menubar .menupop{display:none;position:absolute;top:calc(100% + 3px);left:0;min-width:216px;background:#fff;border:1px solid var(--line2);border-radius:10px;box-shadow:0 14px 36px rgba(20,22,30,.18);padding:6px;z-index:40;}
 .menubar .menu.open .menupop{display:block;}
 .menubar .mi{display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;text-align:left;border:none;background:transparent;color:var(--ink2);font-size:13px;font-weight:500;padding:8px 10px;border-radius:7px;white-space:nowrap;}
@@ -200,14 +202,21 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 .menubar .mi.active{color:var(--accent);font-weight:700;}
 .menubar .mi .kbd{font-size:11px;color:var(--sub3);font-weight:600;}
 .menubar .misep{height:1px;background:#eeeef1;margin:5px 6px;}
-.menubar .zoomgroup{display:flex;align-items:center;gap:2px;border:1px solid var(--line2);border-radius:8px;padding:2px;margin:0 6px;}
-.menubar .zbtn{width:28px;height:28px;border:none;background:transparent;border-radius:6px;color:var(--ink2);font-size:16px;display:flex;align-items:center;justify-content:center;}
-.menubar .zbtn:hover{background:var(--chip);}
-.menubar .zlabel2{min-width:54px;height:28px;border:none;background:transparent;border-radius:6px;font-size:12.5px;font-weight:700;color:var(--ink2);}
-.menubar .zlabel2:hover{background:var(--chip);}
-.menubar .quicktool{border:1px solid var(--line2);background:#fff;color:var(--ink2);font-size:12.5px;font-weight:600;padding:0 12px;height:30px;border-radius:7px;}
-.menubar .quicktool:hover{background:var(--chip);}
-.menubar .quicktool.active{background:var(--grad);color:#fff;border-color:transparent;box-shadow:0 1px 4px rgba(106,76,240,.3);}
+.command-ribbon{height:94px;flex:0 0 94px;display:block;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 7px rgba(24,26,34,.05);overflow-x:auto;overflow-y:hidden;z-index:20;}
+.ribbon-panel{height:100%;display:flex;align-items:stretch;gap:0;padding:7px 10px 5px;}
+.ribbon-panel[hidden]{display:none;}
+.ribbon-group{display:flex;align-items:stretch;gap:4px;padding:0 12px 17px;position:relative;border-right:1px solid var(--line);}
+.ribbon-group:first-child{padding-left:2px;}
+.ribbon-group:last-child{border-right:none;}
+.ribbon-group-label{position:absolute;left:8px;right:8px;bottom:0;text-align:center;color:var(--sub2);font-size:10.5px;line-height:15px;white-space:nowrap;}
+.ribbon-command{width:62px;min-width:54px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--ink2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:5px 5px 4px;font-size:11.5px;font-weight:600;line-height:1.08;}
+.ribbon-command:hover{background:#f5f4f9;border-color:#e8e6ef;}
+.ribbon-command.active{background:#eeeaff;border-color:#cfc4ff;color:#5533dd;}
+.ribbon-command:focus-visible,.menubar button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+.ribbon-command svg{width:28px;height:28px;display:block;flex:0 0 auto;}
+.ribbon-command.wide{width:76px;}
+.ribbon-zoom{display:flex;align-items:center;gap:3px;}
+.ribbon-zoom .ribbon-command{width:48px;}
 #ribbonScrim{z-index:54;}
 
 /* ---- Browser-style tabs (one per open PDF) ---- */
@@ -228,6 +237,13 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 .tabbar .tabadd:hover{background:rgba(20,22,30,.08);color:var(--ink);}
 
 @media (min-width:821px){
+  header.topbar{order:0;}
+  .tabbar{order:1;}
+  .menubar{order:2;}
+  .command-ribbon{order:3;}
+  aside.props{order:4;}
+  .body-flex{order:5;}
+  nav.rail{display:none;}
   aside.props{flex:0 0 auto;max-height:230px;overflow:auto;border-left:none;border-bottom:1px solid var(--line);background:#fbfbfc;}
   aside.props .props-head{display:none;}
   aside.props .props-body{display:flex;flex-flow:row wrap;align-items:center;gap:8px 14px;padding:9px 16px;}
@@ -242,7 +258,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   aside.props .props-body>.row{width:auto;}
   aside.props .props-body>.hint,aside.props .props-body>p.hint{flex-basis:100%;margin:0;}
   /* signature tool → centered popup instead of the horizontal ribbon */
-  body.ribbon-popup aside.props{position:fixed;left:50%;top:72px;transform:translateX(-50%);width:min(380px,92vw);max-height:76vh;overflow:auto;
+  body.ribbon-popup aside.props{position:fixed;left:50%;top:104px;transform:translateX(-50%);width:min(380px,92vw);max-height:76vh;overflow:auto;
     border:1px solid var(--line2);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.32);z-index:55;background:#fff;}
   body.ribbon-popup aside.props .props-head{display:block;padding:15px 18px 4px;}
   body.ribbon-popup aside.props .props-head .sheet-close{display:none;}
@@ -405,11 +421,17 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
       <button class="mi" data-act="tutorial">Quick start</button>
     </div></div>
 
+    <button class="ribbontab active" data-ribbon="home" aria-selected="true">Home</button>
+    <button class="ribbontab" data-ribbon="insert" aria-selected="false">Insert</button>
+    <button class="ribbontab" data-ribbon="draw" aria-selected="false">Draw</button>
+    <button class="ribbontab" data-ribbon="pages" aria-selected="false">Pages</button>
+    <button class="ribbontab" data-ribbon="view" aria-selected="false">View</button>
+    <button class="ribbontab" data-ribbon="help" aria-selected="false">Help</button>
     <div class="spacer"></div>
 
     <div class="zoomgroup" title="Zoom">
       <button class="zbtn" data-act="zoomout" title="Zoom out">&#8722;</button>
-      <button class="zlabel2" data-act="zoomreset" id="hdrZoomLabel" title="Reset zoom">100%</button>
+      <button class="zlabel2" data-act="zoomreset" id="legacyHdrZoomLabel" title="Reset zoom">100%</button>
       <button class="zbtn" data-act="zoomin" title="Zoom in">&#43;</button>
     </div>
     <button class="quicktool active" data-tool="select" title="Select">Select</button>
@@ -418,6 +440,93 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 
   <!-- Browser-style tabs: one per open PDF. Hidden until a document is loaded. -->
   <div class="tabbar" id="tabBar" hidden></div>
+
+  <!-- Second-level command ribbon: each editor tab reveals a focused tool set. -->
+  <div class="command-ribbon desktop-only" id="commandRibbon" aria-label="PDF editor ribbon">
+    <div class="ribbon-panel" data-ribbon-panel="home">
+      <div class="ribbon-group">
+        <button class="ribbon-command" data-act="undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7H4V2"/><path d="M4.5 7.5A9 9 0 1 1 6 18"/></svg><span>Undo</span></button>
+        <button class="ribbon-command" data-act="redo" title="Redo (Ctrl+Y)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h5V2"/><path d="M19.5 7.5A9 9 0 1 0 18 18"/></svg><span>Redo</span></button>
+        <span class="ribbon-group-label">History</span>
+      </div>
+      <div class="ribbon-group">
+        <button class="ribbon-command active" data-tool="select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5 19 10l-6.2 2.1L10.5 19z"/></svg><span>Select</span></button>
+        <button class="ribbon-command" data-tool="hand" title="Pan around the page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M7.2 11.2V7.5a1.55 1.55 0 0 1 3.1 0v2.2-4.1a1.55 1.55 0 0 1 3.1 0v4-3a1.55 1.55 0 0 1 3.1 0v3.9-2.1a1.55 1.55 0 0 1 3.1 0v5.2c0 4.7-3 7.4-7.3 7.4h-.8c-3.3 0-5.4-1.5-7-4.3l-2-3.5a1.7 1.7 0 0 1 2.7-2l2 2.2z"/></svg><span>Pan</span></button>
+        <button class="ribbon-command" data-tool="edittext"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10.5h8M4 15h9"/><path d="m14.5 19.5 5-5 2 2-5 5h-2z"/></svg><span>Edit text</span></button>
+        <span class="ribbon-group-label">Editing tools</span>
+      </div>
+      <div class="ribbon-group">
+        <button class="ribbon-command" data-act="copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="11" height="12" rx="1.5"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h3"/></svg><span>Copy</span></button>
+        <button class="ribbon-command" data-act="paste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 5V3h6v2"/><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 10h6M9 14h6"/></svg><span>Paste</span></button>
+        <button class="ribbon-command" data-act="duplicate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="11" height="11" rx="1.5"/><rect x="4" y="4" width="11" height="11" rx="1.5"/></svg><span>Duplicate</span></button>
+        <button class="ribbon-command" data-act="delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M9 6V3h6v3M7 6l1 15h8l1-15M10 10v7M14 10v7"/></svg><span>Delete</span></button>
+        <span class="ribbon-group-label">Clipboard</span>
+      </div>
+    </div>
+
+    <div class="ribbon-panel" data-ribbon-panel="insert" hidden>
+      <div class="ribbon-group">
+        <button class="ribbon-command" data-tool="text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 5h14M12 5v14M8.5 19h7"/></svg><span>Text</span></button>
+        <button class="ribbon-command" data-tool="image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="m21 16-5-5-8 8"/></svg><span>Picture</span></button>
+        <button class="ribbon-command" data-tool="shape"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="10.5" height="10.5" rx="1"/><circle cx="15.5" cy="15.5" r="4.5"/></svg><span>Shapes</span></button>
+        <span class="ribbon-group-label">Content</span>
+      </div>
+      <div class="ribbon-group">
+        <button class="ribbon-command wide" data-tool="signature"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 15c2.5 0 3-5 5.5-5s2 4 4 4 2.5-4 4.5-4M3 20h18"/></svg><span>Signature</span></button>
+        <button class="ribbon-command wide" data-tool="watermark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><g transform="rotate(-10 12 12)"><rect x="4" y="7" width="16" height="10" rx="1" stroke-dasharray="3 2.5"/><path d="m8 10 1.4 4 2.6-4 2.6 4L16 10"/></g></svg><span>Watermark</span></button>
+        <button class="ribbon-command wide" data-tool="pagenum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9.5 4 8 20M16 4l-1.5 16M5 9h14M4 15h14"/></svg><span>Page no.</span></button>
+        <span class="ribbon-group-label">Document marks</span>
+      </div>
+    </div>
+
+    <div class="ribbon-panel" data-ribbon-panel="draw" hidden>
+      <div class="ribbon-group">
+        <button class="ribbon-command" data-tool="select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 3.5 19 10l-6.2 2.1L10.5 19z"/></svg><span>Select</span></button>
+        <button class="ribbon-command" data-tool="draw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m4 20 3.5-1L19 7.5A1.8 1.8 0 0 0 16.5 5L5 16.5zM14.5 6.5l3 3"/></svg><span>Pen</span></button>
+        <button class="ribbon-command" data-tool="highlight"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m13 5.5 5.5 5.5-6.5 6.5H7l-1.5-4zM4 21h16"/></svg><span>Highlight</span></button>
+        <span class="ribbon-group-label">Drawing tools</span>
+      </div>
+      <div class="ribbon-group">
+        <button class="ribbon-command" data-tool="redact"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="8.5" width="16" height="7" rx="1"/><path d="M6 5h12v1.5H6zM6 17.5h12V19H6z" opacity=".35"/></svg><span>Redact</span></button>
+        <span class="ribbon-group-label">Protection</span>
+      </div>
+    </div>
+
+    <div class="ribbon-panel" data-ribbon-panel="pages" hidden>
+      <div class="ribbon-group">
+        <button class="ribbon-command wide" data-tool="organize"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="3" width="12" height="15" rx="1.5"/><path d="M4 7v11a2 2 0 0 0 2 2h9"/></svg><span>Organize</span></button>
+        <button class="ribbon-command wide" data-act="addpages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 3h10l4 4v14H5zM15 3v5h4M9 14h6M12 11v6"/></svg><span>Add pages</span></button>
+        <button class="ribbon-command wide" data-act="merge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4h7v7H4zM13 13h7v7h-7zM7.5 11v3.5a2 2 0 0 0 2 2H13"/></svg><span>Merge PDFs</span></button>
+        <span class="ribbon-group-label">Pages</span>
+      </div>
+      <div class="ribbon-group">
+        <button class="ribbon-command wide" data-act="togglePages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="7" height="16" rx="1"/><path d="M14 5h6M14 10h6M14 15h6M14 19h4"/></svg><span>Pages panel</span></button>
+        <span class="ribbon-group-label">Navigation</span>
+      </div>
+    </div>
+
+    <div class="ribbon-panel" data-ribbon-panel="view" hidden>
+      <div class="ribbon-group">
+        <button class="ribbon-command wide" data-act="togglePages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="7" height="16" rx="1"/><path d="M14 5h6M14 10h6M14 15h6M14 19h4"/></svg><span>Pages panel</span></button>
+        <button class="ribbon-command wide" data-act="zoomfit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M7 12h10"/></svg><span>Fit width</span></button>
+        <span class="ribbon-group-label">Document view</span>
+      </div>
+      <div class="ribbon-group ribbon-zoom">
+        <button class="ribbon-command" data-act="zoomout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M7.5 10.5h6"/></svg><span>Out</span></button>
+        <button class="ribbon-command wide" data-act="zoomreset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><span id="hdrZoomLabel">100%</span></button>
+        <button class="ribbon-command" data-act="zoomin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M7.5 10.5h6M10.5 7.5v6"/></svg><span>In</span></button>
+        <span class="ribbon-group-label">Zoom</span>
+      </div>
+    </div>
+
+    <div class="ribbon-panel" data-ribbon-panel="help" hidden>
+      <div class="ribbon-group">
+        <button class="ribbon-command wide" data-act="shortcuts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M6 10h2M10 10h2M14 10h2M18 10h1M7 14h10"/></svg><span>Shortcuts</span></button>
+        <button class="ribbon-command wide" data-act="tutorial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.6 2.25c-.9.45-1.3 1-1.3 2M12 17h.01"/></svg><span>Quick start</span></button>
+        <span class="ribbon-group-label">Help</span>
+      </div>
+    </div>
+  </div>
 
   <!-- Contextual ribbon: the active tool's options (relocated from the old right panel). -->
   <div class="scrim" id="ribbonScrim" hidden></div>
@@ -434,7 +543,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
       <button class="railbtn active" data-tool="select" title="Select">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4l14 6-6 2-2 6z"/></svg></button>
       <button class="railbtn" data-tool="hand" title="Hand — pan around">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v17M3.5 12h17M12 3.5l-2.4 2.4M12 3.5l2.4 2.4M12 20.5l-2.4-2.4M12 20.5l2.4-2.4M3.5 12l2.4-2.4M3.5 12l2.4 2.4M20.5 12l-2.4-2.4M20.5 12l-2.4 2.4"/></svg></button>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M7.2 11.2V7.5a1.55 1.55 0 0 1 3.1 0v2.2-4.1a1.55 1.55 0 0 1 3.1 0v4-3a1.55 1.55 0 0 1 3.1 0v3.9-2.1a1.55 1.55 0 0 1 3.1 0v5.2c0 4.7-3 7.4-7.3 7.4h-.8c-3.3 0-5.4-1.5-7-4.3l-2-3.5a1.7 1.7 0 0 1 2.7-2l2 2.2z"/></svg></button>
       <div class="raildiv"></div>
       <button class="railbtn" data-tool="text" title="Text">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5h12M12 5v14M9.5 19h5"/></svg></button>
