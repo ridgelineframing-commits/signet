@@ -4,6 +4,25 @@ const { PDFDocument, degrees, rgb, StandardFonts } = window.PDFLib;
 const $ = (id) => document.getElementById(id);
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
+// Compact PD-F mark: the F has just started moving and a clean, open hand is
+// gripping its right edge. IDs are unique because the mark appears three times.
+document.querySelectorAll(".pdflogo").forEach((oldLogo, i) => {
+  const label = oldLogo.getAttribute("aria-label");
+  const aria = label ? `role="img" aria-label="${escapeHtml(label)}"` : 'aria-hidden="true"';
+  const mark = document.createElement("span");
+  mark.innerHTML = `<svg class="pdflogo" viewBox="0 0 272 100" fill="none" xmlns="http://www.w3.org/2000/svg" ${aria}>
+    <defs><linearGradient id="logoGradient${i}" x1="117" y1="18" x2="176" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="#8A68FF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient></defs>
+    <text x="2" y="75" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="74" letter-spacing="-4" fill="currentColor">PD</text>
+    <path d="M107 37h14M103 50h13M108 63h10" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".28"/>
+    <g transform="rotate(-6 145 52)"><text x="116" y="77" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="76" letter-spacing="-3" fill="url(#logoGradient${i})">F</text></g>
+    <g stroke="currentColor" stroke-width="4.3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M172 57V38a5.2 5.2 0 0 1 10.4 0v11-17a5.2 5.2 0 0 1 10.4 0v17-13a5.2 5.2 0 0 1 10.4 0v14-8a5.2 5.2 0 0 1 10.4 0v20c0 16-10.5 26-27.2 26h-3.5c-13 0-21.2-5.5-27.2-16l-8-13.5a6.2 6.2 0 0 1 9.9-7.2l9.3 10.3c2 2.2 3.8 1.7 5.3-.4z"/>
+      <path d="M172 51c5.2 2.6 10.5 2.7 15.8.2" opacity=".45"/>
+    </g>
+  </svg>`;
+  oldLogo.replaceWith(mark.firstElementChild);
+});
+
 // Non-blocking toast notifications (replaces toast()). type: "info" | "success" | "error".
 function toast(msg, type = "info") {
   let wrap = $("toasts");
@@ -515,12 +534,12 @@ function applyZoom() {
   const h = $("hdrZoomLabel"); if (h) h.textContent = z;
 }
 
-// ------------------------------------------------------------------ tool selection (mobile rail + header menus)
+// ------------------------------------------------------------------ tool selection (mobile rail + desktop ribbon)
 function selectTool(name) {
   tk.tool = name;
   tk.placeArmed = false;
   tk.activeText = null;
-  document.querySelectorAll("#toolRail [data-tool], #menuBar [data-tool]").forEach((x) => x.classList.toggle("active", x.dataset.tool === name));
+  document.querySelectorAll("#toolRail [data-tool], #menuBar [data-tool], #commandRibbon [data-tool]").forEach((x) => x.classList.toggle("active", x.dataset.tool === name));
   document.querySelectorAll("#toolRail [data-tool]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.tool === name)));
   // Signature needs drawing room — on wide screens show it as a centered popup, not the ribbon strip.
   const sigPopup = name === "signature" && !isMobile();
@@ -539,7 +558,22 @@ document.querySelectorAll("#toolRail [data-tool]").forEach((b) => {
 });
 $("ribbonScrim").onclick = () => selectTool("select");
 
-// ---- Word-style header menu bar: dropdowns set the tool or run an action ----
+// ---- Word-style header: first-level tabs switch the second-level command ribbon. ----
+function setRibbonTab(name) {
+  document.querySelectorAll("#menuBar .ribbontab").forEach((tab) => {
+    const active = tab.dataset.ribbon === name;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+  });
+  document.querySelectorAll("#commandRibbon [data-ribbon-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.ribbonPanel !== name;
+  });
+}
+document.querySelectorAll("#menuBar .ribbontab").forEach((tab) => {
+  tab.onclick = (e) => { e.stopPropagation(); closeMenus(); setRibbonTab(tab.dataset.ribbon); };
+});
+
+// File remains a compact dropdown; all editor commands live in the ribbon.
 function closeMenus() {
   document.querySelectorAll("#menuBar .menu.open").forEach((m) => m.classList.remove("open"));
   document.querySelectorAll("#menuBar .menutop").forEach((btn) => btn.setAttribute("aria-expanded", "false"));
@@ -583,7 +617,7 @@ function runMenuAct(act) {
 }
 $("helpClose").onclick = () => ($("helpModalBack").hidden = true);
 $("helpModalBack").onclick = (e) => { if (e.target === $("helpModalBack")) $("helpModalBack").hidden = true; };
-document.querySelectorAll("#menuBar [data-tool], #menuBar [data-act]").forEach((el) => {
+document.querySelectorAll("#menuBar [data-tool], #menuBar [data-act], #commandRibbon [data-tool], #commandRibbon [data-act]").forEach((el) => {
   el.addEventListener("click", (e) => {
     e.stopPropagation(); closeMenus();
     if (el.dataset.tool) selectTool(el.dataset.tool);

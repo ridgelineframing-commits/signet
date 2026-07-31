@@ -4,18 +4,22 @@
       <stop stop-color="#7858F4"/>
       <stop offset="1" stop-color="#4F86FF"/>
     </linearGradient>
+    <linearGradient id="f" x1="230" y1="230" x2="325" y2="362" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8462F7"/>
+      <stop offset="1" stop-color="#4F86FF"/>
+    </linearGradient>
   </defs>
   <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-  <path d="M104 142h222l60 60v170c0 22-18 40-40 40H104c-22 0-40-18-40-40V182c0-22 18-40 40-40Z" fill="#fff"/>
-  <path d="M326 142v60h60" fill="#E9E6FF"/>
-  <path d="M104 142h222l60 60v170c0 22-18 40-40 40H104c-22 0-40-18-40-40V182c0-22 18-40 40-40Z" fill="none" stroke="#352777" stroke-width="12" stroke-linejoin="round"/>
-  <path d="M114 264h29M105 287h28M115 310h20" stroke="#9A91C8" stroke-width="10" stroke-linecap="round"/>
-  <text x="72" y="349" font-family="Arial,sans-serif" font-weight="900" font-size="126" letter-spacing="-9" fill="#292244">PD</text>
-  <g transform="rotate(-8 286 306)">
-    <text x="246" y="359" font-family="Arial,sans-serif" font-weight="900" font-size="137" fill="#6A4CF0">F</text>
+  <path d="M94 128h234l68 68v184c0 23-19 42-42 42H94c-23 0-42-19-42-42V170c0-23 19-42 42-42Z" fill="#fff"/>
+  <path d="M328 128v68h68" fill="#E9E6FF"/>
+  <path d="M94 128h234l68 68v184c0 23-19 42-42 42H94c-23 0-42-19-42-42V170c0-23 19-42 42-42Z" fill="none" stroke="#352777" stroke-width="12" stroke-linejoin="round"/>
+  <text x="68" y="344" font-family="Arial,sans-serif" font-weight="900" font-size="126" letter-spacing="-10" fill="#292244">PD</text>
+  <path d="M218 245h24M210 272h23M218 299h17" stroke="#9A91C8" stroke-width="9" stroke-linecap="round"/>
+  <g transform="rotate(-7 283 298)">
+    <text x="231" y="359" font-family="Arial,sans-serif" font-weight="900" font-size="137" fill="url(#f)">F</text>
   </g>
-  <g fill="#fff" stroke="#292244" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M324 329v-55a14 14 0 0 1 28 0v34-52a14 14 0 0 1 28 0v51-36a14 14 0 0 1 28 0v46-24a14 14 0 0 1 28 0v61c0 48-30 78-76 78h-10c-38 0-63-17-81-49l-20-36a16 16 0 0 1 26-18l25 29c7 8 15 8 24 1Z"/>
-    <path d="M319 314c19 9 39 8 57-2" fill="none"/>
+  <g fill="#fff" stroke="#292244" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M317 323v-48a12 12 0 0 1 24 0v29-42a12 12 0 0 1 24 0v42-31a12 12 0 0 1 24 0v34-18a12 12 0 0 1 24 0v49c0 40-25 65-65 65h-8c-31 0-51-13-66-39l-19-32a14 14 0 0 1 22-16l22 24c5 6 11 4 18-3Z"/>
+    <path d="M317 307c13 7 27 7 40 1" fill="none" opacity=".45"/>
   </g>
 </svg>
