@@ -525,6 +525,10 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
         <button class="ribbon-command wide" data-act="tutorial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.6 2.25c-.9.45-1.3 1-1.3 2M12 17h.01"/></svg><span>Quick start</span></button>
         <span class="ribbon-group-label">Help</span>
       </div>
+      <div class="ribbon-group">
+        <button class="ribbon-command wide" data-act="defaultPdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M9.5 13h5M9.5 16h5"/><path d="m4 12 1.5 1.5L8 11"/></svg><span>Default PDF app</span></button>
+        <span class="ribbon-group-label">Open with Signet</span>
+      </div>
     </div>
   </div>
 
@@ -667,6 +671,20 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
         <strong>Shift</strong> while drawing &mdash; Straight line
       </div>
       <p class="hint" style="margin-top:14px;color:var(--sub3)">Quick start: open a file, choose a tool from the left rail, edit directly on the page, then use File &rarr; Download.</p>
+    </div>
+  </div>
+</div>
+
+<div class="modalback" id="defaultPdfModalBack" hidden>
+  <div class="modal">
+    <div class="modal-head"><div class="t">Use Signet for PDFs</div><button class="closex" id="defaultPdfClose">&#10005;</button></div>
+    <div class="modal-body">
+      <p id="defaultPdfInstructions" style="line-height:1.6;margin:0"></p>
+      <p class="hint" style="margin:12px 0 0">Your device always asks you to approve a default-app change. Signet will never replace that choice silently.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="defaultPdfCancel">Close</button>
+      <button class="btn primary" id="defaultPdfSettings">Open settings</button>
     </div>
   </div>
 </div>

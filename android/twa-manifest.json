@@ -21,8 +21,8 @@
     "path": "./signet-release.keystore",
     "alias": "signet"
   },
-  "appVersionName": "1.0.1",
-  "appVersionCode": 2,
+  "appVersionName": "1.1.0",
+  "appVersionCode": 3,
   "shellApp": false,
   "webManifestUrl": "https://signet.ridgeline.workers.dev/manifest.webmanifest",
   "fallbackType": "customtabs",

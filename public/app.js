@@ -384,6 +384,12 @@ if ("launchQueue" in window && "setConsumer" in window.launchQueue) {
     if (params && params.files && params.files.length) loadLaunchFiles(params.files);
   });
 }
+if (window.signetDesktop?.onOpenPdf) {
+  window.signetDesktop.onOpenPdf(async ({ name, bytes }) => {
+    const ok = await openInNewTab([new File([bytes], name, { type: "application/pdf" })]);
+    if (ok) toast(`Opened ${name}`, "success");
+  });
+}
 // Share target: the service worker caught the POST, stored the file, and redirected here.
 async function consumeSharedFile() {
   try {
@@ -612,11 +618,39 @@ function runMenuAct(act) {
     togglePages: () => $("togglePages").click(),
     shortcuts: () => { $("helpModalBack").hidden = false; },
     tutorial: () => { $("helpModalBack").hidden = false; },
+    defaultPdf: showDefaultPdfHelp,
     merge: () => mergeOpenDocs(),
   }[act] || (() => {}))();
 }
 $("helpClose").onclick = () => ($("helpModalBack").hidden = true);
 $("helpModalBack").onclick = (e) => { if (e.target === $("helpModalBack")) $("helpModalBack").hidden = true; };
+function showDefaultPdfHelp() {
+  const desktop = !!window.signetDesktop;
+  const android = /Android/i.test(navigator.userAgent);
+  const appleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const instructions = desktop
+    ? "Signet is registered to open .pdf files. In Windows Default apps, search for .pdf and choose Signet PDF Editor. You can also right-click any PDF, choose Open with → Choose another app → Signet PDF Editor, then select Always."
+    : android
+      ? "Install Signet, then open a PDF from Files or Downloads. Choose Signet and tap Always. If Android already remembers another viewer, clear that app's defaults in Settings → Apps first."
+      : appleMobile
+        ? "From the Files app, touch and hold a PDF and choose Open With. If Signet is offered, select it; otherwise use Share → Signet. iOS does not let an installed web app silently replace the system PDF viewer."
+        : "Install Signet from your browser, then open a PDF and choose Signet from your system's Open with menu. Select Always when your system offers that choice.";
+  $("defaultPdfInstructions").textContent = instructions;
+  $("defaultPdfSettings").hidden = !desktop;
+  $("defaultPdfModalBack").hidden = false;
+}
+function closeDefaultPdfHelp() { $("defaultPdfModalBack").hidden = true; }
+$("defaultPdfClose").onclick = closeDefaultPdfHelp;
+$("defaultPdfCancel").onclick = closeDefaultPdfHelp;
+$("defaultPdfModalBack").onclick = (e) => { if (e.target === $("defaultPdfModalBack")) closeDefaultPdfHelp(); };
+$("defaultPdfSettings").onclick = async () => {
+  try {
+    await window.signetDesktop?.openDefaultApps();
+    toast("In Default apps, search for .pdf and choose Signet PDF Editor.", "success");
+  } catch {
+    toast("Open Windows Settings → Apps → Default apps and choose Signet for .pdf.", "error");
+  }
+};
 document.querySelectorAll("#menuBar [data-tool], #menuBar [data-act], #commandRibbon [data-tool], #commandRibbon [data-act]").forEach((el) => {
   el.addEventListener("click", (e) => {
     e.stopPropagation(); closeMenus();
