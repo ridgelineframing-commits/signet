@@ -385,9 +385,17 @@ if ("launchQueue" in window && "setConsumer" in window.launchQueue) {
   });
 }
 if (window.signetDesktop?.onOpenPdf) {
-  window.signetDesktop.onOpenPdf(async ({ name, bytes }) => {
-    const ok = await openInNewTab([new File([bytes], name, { type: "application/pdf" })]);
-    if (ok) toast(`Opened ${name}`, "success");
+  let desktopOpenQueue = Promise.resolve();
+  window.signetDesktop.onOpenPdf(({ name, bytes }) => {
+    // Windows can deliver several files while a cold-start document is still rendering.
+    // Serialize them so tab/document state is never mutated by overlapping opens.
+    desktopOpenQueue = desktopOpenQueue.then(async () => {
+      const ok = await openInNewTab([new File([bytes], name, { type: "application/pdf" })]);
+      if (ok) toast(`Opened ${name}`, "success");
+    }).catch((error) => {
+      console.error(error);
+      toast(`Couldn't open ${name}`, "error");
+    });
   });
 }
 // Share target: the service worker caught the POST, stored the file, and redirected here.
