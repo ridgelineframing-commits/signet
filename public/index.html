@@ -105,12 +105,30 @@ aside.thumbs .thead{font-size:11px;font-weight:700;letter-spacing:.06em;text-tra
 .color-control input[type=color]{width:40px;height:38px;padding:3px;border:1px solid var(--line2);border-radius:8px;background:#fff;}
 .color-control input[type=text]{min-width:86px;width:86px;text-transform:uppercase;font-variant-numeric:tabular-nums;}
 
-.pagenav{position:absolute;left:50%;transform:translateX(-50%);bottom:20px;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 4px 18px rgba(20,22,30,.12);padding:6px;z-index:12;}
+.pagenav{position:absolute;left:50%;transform:translateX(-50%);bottom:20px;display:flex;align-items:center;gap:6px;max-width:calc(100% - 16px);overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 4px 18px rgba(20,22,30,.12);padding:6px;z-index:12;}
+.pagenav>*{flex:0 0 auto;}
 .pagenav button{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--sub);border-radius:7px;}
 .pagenav button:hover{background:var(--chip);}
 .pagenav .plabel{font-size:12.5px;color:var(--ink2);font-weight:600;min-width:70px;text-align:center;}
 .pagenav .zlabel{font-size:12.5px;font-weight:600;color:var(--ink2);min-width:48px;height:32px;border-radius:7px;}
 .pagenav .zlabel:hover{background:var(--chip);}
+.pagenav .navtool.on{background:var(--grad);color:#fff;}
+.pagenav .navtool svg{width:17px;height:17px;display:block;}
+
+.quick-toolbar{position:fixed;left:50%;top:210px;transform:translateX(-50%);z-index:35;display:flex;align-items:center;gap:3px;
+  padding:5px;background:rgba(255,255,255,.96);border:1px solid var(--line2);border-radius:11px;box-shadow:0 8px 28px rgba(20,22,30,.18);backdrop-filter:blur(8px);}
+.quick-toolbar.vertical{flex-direction:column;transform:none;left:18px;top:230px;}
+.quick-toolbar .quick-items{display:flex;align-items:center;gap:2px;}
+.quick-toolbar.vertical .quick-items{flex-direction:column;}
+.quick-toolbar button{width:34px;height:34px;border:none;border-radius:7px;background:transparent;color:var(--ink2);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;}
+.quick-toolbar button:hover{background:var(--chip);}
+.quick-toolbar button.on{background:var(--grad);color:#fff;}
+.quick-toolbar .quick-grip{cursor:move;color:var(--sub2);font-size:18px;touch-action:none;}
+.quick-toolbar .quick-settings{color:var(--sub2);}
+.quick-tool-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.quick-tool-list label{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:13px;cursor:pointer;}
+.quick-tool-list input{accent-color:var(--accent);}
+.sig-font-preview{font-size:24px;line-height:1.2;padding:9px 11px;border:1px solid var(--line2);border-radius:8px;background:#fff;}
 
 aside.props{flex:0 0 300px;background:#fff;border-left:1px solid var(--line);overflow-y:auto;}
 .props-head{padding:18px 20px 14px;border-bottom:1px solid #eeeef1;}
@@ -300,6 +318,10 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   .pagenav{bottom:70px;padding:5px;gap:3px;}
   .pagenav .plabel{min-width:52px;font-size:12px;}
   .pagenav .zlabel{min-width:44px;}
+  .quick-toolbar{top:auto;bottom:124px;max-width:calc(100vw - 18px);}
+  .quick-toolbar:not(.vertical){overflow-x:auto;}
+  .quick-toolbar.vertical{left:8px;top:120px;bottom:auto;max-height:calc(100vh - 200px);overflow-y:auto;}
+  .quick-tool-list{grid-template-columns:1fr;}
 
   /* properties → bottom sheet */
   aside.props{position:fixed;left:0;right:0;bottom:58px;top:auto;flex:none;width:auto;
@@ -363,7 +385,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <!-- These duplicate the File menu on desktop, so they show only on mobile (no menu bar there).
          Their handlers stay wired; the File menu triggers them via .click(). -->
     <button class="btn mobile-only" id="openEnvelopesBtn"><span class="mobile-only" aria-label="Requests">&#128233;</span></button>
-    <button class="icon-btn mobile-only" id="downloadBtn" title="Download" disabled>&#8681;</button>
+    <button class="icon-btn mobile-only" id="downloadBtn" title="Save As" disabled>&#8681;</button>
     <button class="btn primary mobile-only" id="requestSigBtn" disabled><span class="mobile-only">Send</span></button>
   </header>
 
@@ -374,7 +396,9 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
       <button class="mi" data-act="addpages">Add pages…</button>
       <button class="mi" data-act="merge">Merge open PDFs</button>
       <div class="misep"></div>
-      <button class="mi" data-act="download">Download</button>
+      <button class="mi" data-act="save">Save <span class="kbd">Ctrl+S</span></button>
+      <button class="mi" data-act="saveas">Save As… <span class="kbd">Ctrl+Shift+S</span></button>
+      <button class="mi" data-act="download">Export a copy</button>
       <button class="mi" data-act="send">Send for signature</button>
       <button class="mi" data-act="requests">Signature requests</button>
     </div></div>
@@ -597,15 +621,36 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
         <div class="pageshell" id="pageShell" hidden></div>
       </div>
       <div class="pagenav" id="pageNav" hidden>
+        <button class="navtool on" id="pnSelect" title="Select"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3.5 19 10l-6.2 2.1L10.5 19z"/></svg></button>
+        <button class="navtool" id="pnPan" title="Pan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M7.2 11.2V7.5a1.55 1.55 0 0 1 3.1 0v2.2-4.1a1.55 1.55 0 0 1 3.1 0v4-3a1.55 1.55 0 0 1 3.1 0v3.9-2.1a1.55 1.55 0 0 1 3.1 0v5.2c0 4.7-3 7.4-7.3 7.4h-.8c-3.3 0-5.4-1.5-7-4.3l-2-3.5a1.7 1.7 0 0 1 2.7-2l2 2.2z"/></svg></button>
+        <div class="vdiv"></div>
         <button id="pnPrev" title="Previous page">&#8592;</button>
         <div class="plabel" id="pnLabel">1 / 1</div>
         <button id="pnNext" title="Next page">&#8594;</button>
-        <div class="vdiv mobile-only"></div>
-        <button class="mobile-only" id="pnZoomOut" title="Zoom out">&#8722;</button>
-        <button class="zlabel mobile-only" id="pnZoomReset" title="Reset zoom">100%</button>
-        <button class="mobile-only" id="pnZoomIn" title="Zoom in">&#43;</button>
+        <div class="vdiv"></div>
+        <button id="pnZoomOut" title="Zoom out">&#8722;</button>
+        <button class="zlabel" id="pnZoomReset" title="Reset zoom">100%</button>
+        <button id="pnZoomIn" title="Zoom in">&#43;</button>
+      </div>
+      <div class="quick-toolbar" id="quickToolbar" hidden aria-label="Favorite tools">
+        <button class="quick-grip" id="quickGrip" title="Drag quick toolbar" aria-label="Drag quick toolbar">&#8942;&#8942;</button>
+        <div class="quick-items" id="quickItems"></div>
+        <button class="quick-settings" id="quickSettings" title="Customize quick toolbar" aria-label="Customize quick toolbar">&#9881;</button>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="modalback" id="quickToolbarModal" hidden>
+  <div class="modal">
+    <div class="modal-head"><div><div class="t">Customize quick toolbar</div><div class="hint">Choose favorites, orientation, then drag it anywhere.</div></div><button class="closex" id="quickToolbarClose">&#10005;</button></div>
+    <div class="modal-body">
+      <div class="label">Orientation</div>
+      <div class="tabbtns" id="quickOrientation"><button data-orientation="horizontal">Horizontal</button><button data-orientation="vertical">Vertical</button></div>
+      <div class="label">Favorite commands</div>
+      <div class="quick-tool-list" id="quickToolList"></div>
+    </div>
+    <div class="modal-foot"><button class="btn" id="quickToolbarReset">Reset defaults</button><button class="btn primary" id="quickToolbarDone">Done</button></div>
   </div>
 </div>
 

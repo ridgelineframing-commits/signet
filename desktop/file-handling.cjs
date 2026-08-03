@@ -79,7 +79,14 @@ function unregisterWindowsPdfHandler() {
   tryDelete(["HKCU\\Software\\RegisteredApplications", "/v", REGISTERED_APP]);
 }
 
+function canOverwritePdf(requestedPath, allowedPaths) {
+  if (typeof requestedPath !== "string" || !requestedPath.trim()) return false;
+  const resolved = path.resolve(requestedPath);
+  return resolved.toLowerCase().endsWith(".pdf") && allowedPaths instanceof Set && allowedPaths.has(resolved.toLowerCase());
+}
+
 module.exports = {
+  canOverwritePdf,
   extractPdfPaths,
   registerWindowsPdfHandler,
   unregisterWindowsPdfHandler,

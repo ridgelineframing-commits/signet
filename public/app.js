@@ -88,7 +88,7 @@ $("loginCancel").onclick = () => closeLogin(false);
 
 // ------------------------------------------------------------------ core state
 const tk = {
-  pdfDoc: null, order: [], annos: [], fileName: "",
+  pdfDoc: null, order: [], annos: [], fileName: "", sourcePath: null, fileHandle: null,
   tool: "select", currentPage: 0, zoom: 100,
   pendingSig: null, pendingText: { size: 14, color: "#191b1f", bold: false, italic: false, underline: false, align: "left" },
   activeText: null,
@@ -104,7 +104,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 // sizing and vector stroke widths visually consistent with the exported PDF.
 const RENDER_SCALE = 1.4;
 const TOOL_LABELS = {
-  select: ["Select", "Drag any element to move it; drag its corner handle to resize. Double-click text to edit it."],
+  select: ["Select", "Drag any element to move it; drag its corner handle to resize. Click text to edit it."],
   hand: ["Hand", "Drag the page to pan around. Nothing is added to the document."],
   text: ["Text", "Click anywhere on the page, then type directly on it."],
   edittext: ["Edit text", "OCR the page, then edit its existing text in place (Adobe-style)."],
@@ -126,10 +126,10 @@ function hasDoc() { return !!tk.pdfDoc && tk.order.length > 0; }
 // Switching snapshots `tk` into the current slot and loads the target slot into `tk`.
 let openDocs = [];
 let activeTab = -1;
-const DOC_FIELDS = ["pdfDoc", "order", "annos", "fileName", "currentPage", "zoom", "autoFit", "_renderDoc", "_renderDirty", "_pageDims", "selectedAnno", "activeText"];
+const DOC_FIELDS = ["pdfDoc", "order", "annos", "fileName", "sourcePath", "fileHandle", "currentPage", "zoom", "autoFit", "_renderDoc", "_renderDirty", "_pageDims", "selectedAnno", "activeText"];
 function captureDoc() { const s = {}; for (const k of DOC_FIELDS) s[k] = tk[k]; s.undoStack = undoStack; s.redoStack = redoStack; return s; }
 function applyDoc(s) { for (const k of DOC_FIELDS) tk[k] = s[k]; undoStack = s.undoStack; redoStack = s.redoStack; }
-function blankDocState() { return { pdfDoc: null, order: [], annos: [], fileName: "", currentPage: 0, zoom: 100, autoFit: true, _renderDoc: null, _renderDirty: true, _pageDims: null, selectedAnno: null, activeText: null, undoStack: [], redoStack: [] }; }
+function blankDocState() { return { pdfDoc: null, order: [], annos: [], fileName: "", sourcePath: null, fileHandle: null, currentPage: 0, zoom: 100, autoFit: true, _renderDoc: null, _renderDirty: true, _pageDims: null, selectedAnno: null, activeText: null, undoStack: [], redoStack: [] }; }
 function syncActive() { if (activeTab >= 0 && activeTab < openDocs.length) openDocs[activeTab] = captureDoc(); }
 function refreshDocChrome() {
   const has = hasDoc();
@@ -141,6 +141,7 @@ function refreshDocChrome() {
   $("requestSigBtn").disabled = !has;
   $("addPagesBtn").hidden = !has;
   $("pagesToggle").hidden = !has;
+  $("quickToolbar").hidden = !has;
   $("docTitleLbl").textContent = has ? (tk.fileName || "Untitled document") : "No document loaded";
   $("pageCountChip").hidden = !has;
 }
@@ -386,12 +387,16 @@ if ("launchQueue" in window && "setConsumer" in window.launchQueue) {
 }
 if (window.signetDesktop?.onOpenPdf) {
   let desktopOpenQueue = Promise.resolve();
-  window.signetDesktop.onOpenPdf(({ name, bytes }) => {
+  window.signetDesktop.onOpenPdf(({ name, path, bytes }) => {
     // Windows can deliver several files while a cold-start document is still rendering.
     // Serialize them so tab/document state is never mutated by overlapping opens.
     desktopOpenQueue = desktopOpenQueue.then(async () => {
       const ok = await openInNewTab([new File([bytes], name, { type: "application/pdf" })]);
-      if (ok) toast(`Opened ${name}`, "success");
+      if (ok) {
+        tk.sourcePath = path || null;
+        syncActive();
+        toast(`Opened ${name}`, "success");
+      }
     }).catch((error) => {
       console.error(error);
       toast(`Couldn't open ${name}`, "error");
@@ -463,7 +468,7 @@ async function renderThumbs() {
     const card = document.createElement("div"); card.className = "card"; card.appendChild(canvas);
     const lbl = document.createElement("span"); lbl.className = "lbl"; lbl.textContent = "Page " + (i + 1);
     btn.appendChild(card); btn.appendChild(lbl);
-    btn.onclick = () => { tk.currentPage = i; fullRerenderLight(); if (isMobile()) closeThumbs(); };
+    btn.onclick = () => { goToPage(i); if (isMobile()) closeThumbs(); };
     btn.ondragstart = (ev) => ev.dataTransfer.setData("text/plain", String(i));
     btn.ondragover = (ev) => ev.preventDefault();
     btn.ondrop = (ev) => {
@@ -495,6 +500,8 @@ function clampPage() {
 }
 
 async function renderCurrentPage() {
+  const scroller = $("canvasScroll");
+  const savedScroll = { left: scroller.scrollLeft, top: scroller.scrollTop };
   const shell = $("pageShell");
   shell.innerHTML = "";
   if (!hasDoc()) return;
@@ -516,6 +523,10 @@ async function renderCurrentPage() {
 
   for (const a of tk.annos.filter((a) => a.page === tk.currentPage)) drawMarker(box, a);
   bindCanvasInteraction(box);
+  // Rebuilding the shell briefly collapses its height. Restore the same-page viewport so
+  // typing, styling, moving, or drawing never throws the user back to the top of the PDF.
+  scroller.scrollLeft = savedScroll.left;
+  scroller.scrollTop = savedScroll.top;
 }
 
 function updatePageNav() {
@@ -525,11 +536,19 @@ function updatePageNav() {
   { const h = $("hdrZoomLabel"); if (h) h.textContent = tk.zoom + "%"; }
   $("pageCountChip").textContent = tk.order.length + (tk.order.length === 1 ? " page" : " pages");
 }
-$("pnPrev").onclick = () => { if (tk.currentPage > 0) { tk.currentPage--; fullRerenderLight(); } };
-$("pnNext").onclick = () => { if (tk.currentPage < tk.order.length - 1) { tk.currentPage++; fullRerenderLight(); } };
+function goToPage(index) {
+  if (!hasDoc() || index < 0 || index >= tk.order.length || index === tk.currentPage) return;
+  tk.currentPage = index;
+  const scroller = $("canvasScroll"); scroller.scrollTop = 0; scroller.scrollLeft = 0;
+  fullRerenderLight();
+}
+$("pnPrev").onclick = () => goToPage(tk.currentPage - 1);
+$("pnNext").onclick = () => goToPage(tk.currentPage + 1);
 $("pnZoomOut").onclick = () => setZoom(tk.zoom - 10);
 $("pnZoomIn").onclick = () => setZoom(tk.zoom + 10);
 $("pnZoomReset").onclick = () => setZoom(100);
+$("pnSelect").onclick = () => selectTool("select");
+$("pnPan").onclick = () => selectTool("hand");
 function setZoom(z, manual = true) {
   tk.autoFit = !manual;
   tk.zoom = Math.max(30, Math.min(400, Math.round(z)));
@@ -554,6 +573,9 @@ function selectTool(name) {
   tk.placeArmed = false;
   tk.activeText = null;
   document.querySelectorAll("#toolRail [data-tool], #menuBar [data-tool], #commandRibbon [data-tool]").forEach((x) => x.classList.toggle("active", x.dataset.tool === name));
+  $("pnSelect")?.classList.toggle("on", name === "select");
+  $("pnPan")?.classList.toggle("on", name === "hand");
+  document.querySelectorAll("#quickItems [data-tool]").forEach((x) => x.classList.toggle("on", x.dataset.tool === name));
   document.querySelectorAll("#toolRail [data-tool]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.tool === name)));
   // Signature needs drawing room — on wide screens show it as a centered popup, not the ribbon strip.
   const sigPopup = name === "signature" && !isMobile();
@@ -628,7 +650,11 @@ function runMenuAct(act) {
   ({
     open: () => $("fileInput").click(),
     addpages: () => $("addPagesInput").click(),
-    download: () => $("downloadBtn").click(),
+    save: () => saveDocument(false),
+    saveas: () => saveDocument(true),
+    download: exportDocument,
+    prevpage: () => goToPage(tk.currentPage - 1),
+    nextpage: () => goToPage(tk.currentPage + 1),
     send: () => $("requestSigBtn").click(),
     requests: () => $("openEnvelopesBtn").click(),
     undo, redo, copy: copySelected, paste: pasteClip, duplicate: duplicateSelected, delete: deleteSelected,
@@ -640,6 +666,102 @@ function runMenuAct(act) {
     merge: () => mergeOpenDocs(),
   }[act] || (() => {}))();
 }
+
+// Movable favorites toolbar. Preferences stay on this device and are shared across PDFs.
+const QUICK_KEY = "signet.quickToolbar.v1";
+const QUICK_COMMANDS = [
+  { id: "select", label: "Select", glyph: "↖", tool: "select" },
+  { id: "hand", label: "Pan", glyph: "✋", tool: "hand" },
+  { id: "text", label: "Add text", glyph: "T", tool: "text" },
+  { id: "signature", label: "Signature", glyph: "✎", tool: "signature" },
+  { id: "draw", label: "Draw", glyph: "⌁", tool: "draw" },
+  { id: "highlight", label: "Highlight", glyph: "▰", tool: "highlight" },
+  { id: "image", label: "Image", glyph: "▧", tool: "image" },
+  { id: "undo", label: "Undo", glyph: "↶", act: "undo" },
+  { id: "redo", label: "Redo", glyph: "↷", act: "redo" },
+  { id: "save", label: "Save", glyph: "▣", act: "save" },
+  { id: "saveas", label: "Save As", glyph: "⇩", act: "saveas" },
+  { id: "prevpage", label: "Previous page", glyph: "←", act: "prevpage" },
+  { id: "nextpage", label: "Next page", glyph: "→", act: "nextpage" },
+  { id: "zoomout", label: "Zoom out", glyph: "−", act: "zoomout" },
+  { id: "zoomin", label: "Zoom in", glyph: "+", act: "zoomin" },
+  { id: "zoomfit", label: "Fit width", glyph: "↔", act: "zoomfit" },
+];
+const QUICK_DEFAULTS = ["select", "hand", "text", "signature", "save", "prevpage", "nextpage", "zoomout", "zoomin"];
+function loadQuickPrefs() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(QUICK_KEY));
+    if (parsed && Array.isArray(parsed.items)) return parsed;
+  } catch {}
+  return { items: [...QUICK_DEFAULTS], orientation: "horizontal", left: null, top: null };
+}
+function saveQuickPrefs(prefs) { try { localStorage.setItem(QUICK_KEY, JSON.stringify(prefs)); } catch {} }
+let quickPrefs = loadQuickPrefs();
+function applyQuickPosition() {
+  const bar = $("quickToolbar");
+  bar.classList.toggle("vertical", quickPrefs.orientation === "vertical");
+  if (Number.isFinite(quickPrefs.left) && Number.isFinite(quickPrefs.top)) {
+    bar.style.left = `${quickPrefs.left}px`; bar.style.top = `${quickPrefs.top}px`;
+    bar.style.bottom = "auto"; bar.style.transform = "none";
+  } else {
+    bar.style.left = ""; bar.style.top = ""; bar.style.bottom = ""; bar.style.transform = "";
+  }
+}
+function renderQuickToolbar() {
+  const wrap = $("quickItems"); wrap.innerHTML = "";
+  for (const id of quickPrefs.items) {
+    const cmd = QUICK_COMMANDS.find((item) => item.id === id); if (!cmd) continue;
+    const btn = document.createElement("button"); btn.type = "button"; btn.textContent = cmd.glyph; btn.title = cmd.label;
+    if (cmd.tool) { btn.dataset.tool = cmd.tool; btn.classList.toggle("on", tk.tool === cmd.tool); btn.onclick = () => selectTool(cmd.tool); }
+    else { btn.dataset.act = cmd.act; btn.onclick = () => runMenuAct(cmd.act); }
+    wrap.appendChild(btn);
+  }
+  applyQuickPosition();
+}
+function renderQuickEditor() {
+  const list = $("quickToolList"); list.innerHTML = "";
+  for (const cmd of QUICK_COMMANDS) {
+    const label = document.createElement("label");
+    label.innerHTML = `<input type="checkbox" value="${cmd.id}" ${quickPrefs.items.includes(cmd.id) ? "checked" : ""}> <span>${cmd.glyph}&nbsp; ${escapeHtml(cmd.label)}</span>`;
+    label.querySelector("input").onchange = (event) => {
+      if (event.target.checked) { if (!quickPrefs.items.includes(cmd.id)) quickPrefs.items.push(cmd.id); }
+      else quickPrefs.items = quickPrefs.items.filter((id) => id !== cmd.id);
+      saveQuickPrefs(quickPrefs); renderQuickToolbar();
+    };
+    list.appendChild(label);
+  }
+  $("quickOrientation").querySelectorAll("button").forEach((button) => button.classList.toggle("active", button.dataset.orientation === quickPrefs.orientation));
+}
+$("quickSettings").onclick = () => { renderQuickEditor(); $("quickToolbarModal").hidden = false; };
+function closeQuickEditor() { $("quickToolbarModal").hidden = true; }
+$("quickToolbarClose").onclick = closeQuickEditor;
+$("quickToolbarDone").onclick = closeQuickEditor;
+$("quickToolbarModal").onclick = (event) => { if (event.target === $("quickToolbarModal")) closeQuickEditor(); };
+$("quickOrientation").querySelectorAll("button").forEach((button) => {
+  button.onclick = () => { quickPrefs.orientation = button.dataset.orientation; saveQuickPrefs(quickPrefs); renderQuickToolbar(); renderQuickEditor(); };
+});
+$("quickToolbarReset").onclick = () => { quickPrefs = { items: [...QUICK_DEFAULTS], orientation: "horizontal", left: null, top: null }; saveQuickPrefs(quickPrefs); renderQuickToolbar(); renderQuickEditor(); };
+$("quickGrip").onpointerdown = (event) => {
+  event.preventDefault();
+  const bar = $("quickToolbar"), rect = bar.getBoundingClientRect();
+  const offsetX = event.clientX - rect.left, offsetY = event.clientY - rect.top;
+  const move = (next) => {
+    const left = Math.max(4, Math.min(window.innerWidth - bar.offsetWidth - 4, next.clientX - offsetX));
+    const top = Math.max(4, Math.min(window.innerHeight - bar.offsetHeight - 4, next.clientY - offsetY));
+    bar.style.left = `${left}px`; bar.style.top = `${top}px`; bar.style.bottom = "auto"; bar.style.transform = "none";
+    quickPrefs.left = left; quickPrefs.top = top;
+  };
+  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); saveQuickPrefs(quickPrefs); };
+  window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+};
+window.addEventListener("resize", () => {
+  if (!Number.isFinite(quickPrefs.left) || !Number.isFinite(quickPrefs.top)) return;
+  const bar = $("quickToolbar");
+  quickPrefs.left = Math.max(4, Math.min(window.innerWidth - bar.offsetWidth - 4, quickPrefs.left));
+  quickPrefs.top = Math.max(4, Math.min(window.innerHeight - bar.offsetHeight - 4, quickPrefs.top));
+  applyQuickPosition(); saveQuickPrefs(quickPrefs);
+});
+renderQuickToolbar();
 $("helpClose").onclick = () => ($("helpModalBack").hidden = true);
 $("helpModalBack").onclick = (e) => { if (e.target === $("helpModalBack")) $("helpModalBack").hidden = true; };
 function showDefaultPdfHelp() {
@@ -749,6 +871,7 @@ const inEditable = (t) => t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA
 window.addEventListener("keydown", (e) => {
   const mod = e.ctrlKey || e.metaKey;
   const k = e.key.toLowerCase();
+  if (mod && k === "s") { e.preventDefault(); saveDocument(!!e.shiftKey); return; }
   if (mod && k === "z") { if (inEditable(e.target)) return; e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && k === "y") { if (inEditable(e.target)) return; e.preventDefault(); redo(); return; }
   if (mod && k === "c") { if (inEditable(e.target) || !currentSelection()) return; e.preventDefault(); copySelected(); return; }
@@ -793,8 +916,8 @@ function styleTextEl(m, a) {
   m.style.textAlign = a.align || "left";
 }
 function drawTextMarker(box, a) {
-  // Text tool → type inline. Select tool → drag to move, double-click to edit in place.
-  const typing = tk.tool === "text" || (tk.tool === "select" && a._editing);
+  // Text tool → type inline. Select tool → click to edit or drag to move.
+  const typing = tk.tool === "text" || a._editing;
   const movable = tk.tool === "select" && !a._editing;
   const m = document.createElement("div");
   m.className = "textmarker";
@@ -820,7 +943,6 @@ function drawTextMarker(box, a) {
     m.style.cursor = "move";
     m.style.border = "1px dashed rgba(120,120,130,.45)";
     m.addEventListener("pointerdown", (e) => startTextMove(box, a, m, e));
-    m.addEventListener("dblclick", async () => { a._editing = true; await renderCurrentPage(); if (a._el) { a._el.focus(); placeCaretEnd(a._el); } });
   } else {
     m.style.pointerEvents = "none";
   }
@@ -900,7 +1022,11 @@ function startTextMove(box, a, el, e) {
   const pre = annoSnapshot();
   const rect = box.getBoundingClientRect(); const sx = e.clientX, sy = e.clientY; let moved = false;
   const move = (ev) => { moved = true; el.style.transform = `translate(${ev.clientX - sx}px,${ev.clientY - sy}px)`; };
-  const up = (ev) => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); if (moved) { pushUndoState(pre); a.x += (ev.clientX - sx) / rect.width; a.y += (ev.clientY - sy) / rect.height; renderCurrentPage(); } };
+  const up = async (ev) => {
+    window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
+    if (moved) { pushUndoState(pre); a.x += (ev.clientX - sx) / rect.width; a.y += (ev.clientY - sy) / rect.height; await renderCurrentPage(); }
+    else { a._editing = true; tk.activeText = a; await renderCurrentPage(); if (a._el) { a._el.focus(); placeCaretEnd(a._el); } renderPropsPanel(); }
+  };
   window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
 }
 function placeCaretEnd(el) {
@@ -1219,7 +1345,7 @@ function placeImage(box, x, y) {
 
 async function placeText(x, y) {
   const t = tk.pendingText;
-  const a = { kind: "text", page: tk.currentPage, x, y, text: "", size: t.size, color: t.color, bold: t.bold, italic: t.italic, underline: t.underline, align: t.align };
+  const a = { kind: "text", page: tk.currentPage, x, y, text: "", size: t.size, color: t.color, bold: t.bold, italic: t.italic, underline: t.underline, align: t.align, _editing: true };
   pushUndo();
   tk.annos.push(a);
   tk.activeText = a;
@@ -1246,7 +1372,7 @@ function renderPropsPanel() {
   const builders = { select: buildSelectPanel, hand: buildHandPanel, text: buildTextPanel, edittext: buildEditTextPanel, signature: buildSigPanel, draw: buildDrawPanel, shape: buildShapePanel, highlight: buildHighlightPanel, image: buildImagePanel, redact: buildRedactPanel, watermark: buildWatermarkPanel, pagenum: buildPagenumPanel, organize: buildOrganizePanel };
   (builders[tk.tool] || buildSelectPanel)(body);
 }
-function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Click an element to select it, then drag to move, or drag the corner to resize. Double-click text to edit. Keyboard shortcuts are in the <strong>Help</strong> menu.</div>'; }
+function buildSelectPanel(body) { body.innerHTML = '<div class="props-empty">Click text to edit it. Drag an element to move it, or drag its corner to resize. Keyboard shortcuts are in the <strong>Help</strong> menu.</div>'; }
 function buildHandPanel(body) { body.innerHTML = '<p class="hint">Drag anywhere on the page to pan around. Handy when zoomed in. This tool never changes the document.</p>'; }
 
 function buildEditTextPanel(body) {
@@ -1374,6 +1500,15 @@ function buildTextPanel(body) {
 }
 
 let sigPadCtx = null, sigDrawing = false, sigLast = null, sigPadDirty = false, sigActiveTab = "draw", sigUploadDataUrl = null;
+const SIG_TYPE_FONTS = [
+  { label: "Brush Script", css: "'Brush Script MT', 'Segoe Script', cursive" },
+  { label: "Segoe Script", css: "'Segoe Script', 'Brush Script MT', cursive" },
+  { label: "Lucida Handwriting", css: "'Lucida Handwriting', 'Bradley Hand ITC', cursive" },
+  { label: "Bradley Hand", css: "'Bradley Hand ITC', 'Segoe Print', cursive" },
+  { label: "Classic italic", css: "Georgia, 'Times New Roman', serif" },
+  { label: "Clean signature", css: "'Hanken Grotesk', Arial, sans-serif" },
+];
+let sigTypedName = "", sigTypedFont = SIG_TYPE_FONTS[0].css;
 // Saved signatures — persisted in the browser so you can reuse them on every
 // document without redrawing. Purely local (localStorage); nothing is uploaded
 // and no sign-in is involved.
@@ -1404,7 +1539,9 @@ function buildSigPanel(body) {
       <button class="btn" id="sigClear" style="width:100%;justify-content:center;margin-top:8px">Clear</button>
     </div>
     <div id="sTabType" ${sigActiveTab !== "type" ? "hidden" : ""}>
-      <input type="text" id="sigTypeInput" placeholder="Type your name" style="width:100%;font-size:22px;font-family:'Brush Script MT',cursive;padding:12px" />
+      <div class="label">Signature font</div>
+      <select id="sigFontSelect" style="width:100%;margin-bottom:9px">${SIG_TYPE_FONTS.map((font) => `<option value="${escapeHtml(font.css)}" ${font.css === sigTypedFont ? "selected" : ""}>${escapeHtml(font.label)}</option>`).join("")}</select>
+      <input type="text" id="sigTypeInput" class="sig-font-preview" value="${escapeHtml(sigTypedName)}" placeholder="Type your name" style="width:100%;font-family:${sigTypedFont}" />
     </div>
     <div id="sTabUpload" ${sigActiveTab !== "upload" ? "hidden" : ""}>
       <input type="file" id="sigUploadInput" accept="image/*" style="width:100%" />
@@ -1442,14 +1579,24 @@ function buildSigPanel(body) {
       sigUploadDataUrl = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
     };
   }
+  if (sigActiveTab === "type") {
+    $("sigTypeInput").oninput = (event) => (sigTypedName = event.target.value);
+    $("sigFontSelect").onchange = (event) => {
+      sigTypedFont = event.target.value;
+      $("sigTypeInput").style.fontFamily = sigTypedFont;
+      $("sigTypeInput").focus();
+    };
+  }
   async function buildDataUrl() {
     if (sigActiveTab === "draw") return sigPadDirty ? $("sigPad").toDataURL("image/png") : null;
     if (sigActiveTab === "type") {
-      const name = $("sigTypeInput").value.trim();
+      const name = $("sigTypeInput").value.trim(); sigTypedName = name;
       if (!name) return null;
       const c = document.createElement("canvas"); c.width = 500; c.height = 140;
-      const cx = c.getContext("2d"); cx.fillStyle = "#fff"; cx.fillRect(0, 0, c.width, c.height);
-      cx.fillStyle = "#16232f"; cx.font = "56px 'Brush Script MT', cursive"; cx.fillText(name, 20, 90);
+      const cx = c.getContext("2d"); cx.fillStyle = "#16232f";
+      let size = 62; cx.font = `${size}px ${sigTypedFont}`;
+      while (size > 30 && cx.measureText(name).width > 460) { size -= 2; cx.font = `${size}px ${sigTypedFont}`; }
+      cx.textBaseline = "middle"; cx.fillText(name, 20, 72);
       return c.toDataURL("image/png");
     }
     return sigUploadDataUrl;
@@ -1785,6 +1932,53 @@ async function rasterizePdf(bytes) {
 function dataUrlToBytes(dataUrl) { const b64 = dataUrl.split(",")[1]; const bin = atob(b64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return bytes; }
 function downloadBytes(bytes, filename) { const blob = new Blob([bytes], { type: "application/pdf" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
 
+async function exportDocument() {
+  if (!hasDoc()) return;
+  const bytes = await bakeAndExport();
+  downloadBytes(bytes, (tk.fileName || "signet-export").replace(/\.pdf$/i, "") + "-export.pdf");
+}
+
+async function saveDocument(saveAs = false) {
+  if (!hasDoc()) return;
+  const suggestedName = (tk.fileName || "document.pdf").replace(/[^\w .()-]/g, "_");
+  try {
+    if (window.signetDesktop?.savePdf) {
+      const bytes = await bakeAndExport();
+      const result = await window.signetDesktop.savePdf({ bytes, path: tk.sourcePath, suggestedName, saveAs });
+      if (!result || result.canceled) return;
+      tk.sourcePath = result.path || tk.sourcePath;
+      tk.fileName = result.name || tk.fileName;
+      syncActive(); refreshDocChrome(); renderTabs();
+      toast(saveAs ? `Saved as ${tk.fileName}` : `Saved ${tk.fileName}`, "success");
+      return;
+    }
+
+    let handle = !saveAs ? tk.fileHandle : null;
+    if (!handle && window.showSaveFilePicker) {
+      handle = await window.showSaveFilePicker({
+        suggestedName: suggestedName.toLowerCase().endsWith(".pdf") ? suggestedName : `${suggestedName}.pdf`,
+        types: [{ description: "PDF document", accept: { "application/pdf": [".pdf"] } }],
+      });
+    }
+    const bytes = await bakeAndExport();
+    if (handle) {
+      const writable = await handle.createWritable();
+      await writable.write(new Blob([bytes], { type: "application/pdf" }));
+      await writable.close();
+      tk.fileHandle = handle; tk.fileName = handle.name || tk.fileName;
+      syncActive(); refreshDocChrome(); renderTabs();
+      toast(saveAs ? `Saved as ${tk.fileName}` : `Saved ${tk.fileName}`, "success");
+    } else {
+      downloadBytes(bytes, suggestedName.toLowerCase().endsWith(".pdf") ? suggestedName : `${suggestedName}.pdf`);
+      toast("Saved a PDF copy to Downloads.", "success");
+    }
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    console.error(error);
+    toast(`Couldn't save this PDF: ${error?.message || "unknown error"}`, "error");
+  }
+}
+
 async function flattenNow() {
   if (!tk.annos.some((a) => a.kind === "redact")) return toast("Mark at least one redaction box first.", "error");
   const baked = await bakeAndExport();
@@ -1797,7 +1991,8 @@ async function flattenNow() {
   toast("Redactions applied and flattened — the underlying content is permanently removed.", "success");
 }
 
-$("downloadBtn").onclick = async () => { if (!hasDoc()) return; const bytes = await bakeAndExport(); downloadBytes(bytes, (tk.fileName || "signet-export").replace(/\.pdf$/i, "") + "-export.pdf"); };
+$("downloadBtn").title = "Save As";
+$("downloadBtn").onclick = () => saveDocument(true);
 
 // ------------------------------------------------------------------ envelopes: requests drawer
 const STATUS_LABEL = {

@@ -14,4 +14,7 @@ contextBridge.exposeInMainWorld("signetDesktop", {
   openDefaultApps() {
     return ipcRenderer.invoke("signet:open-default-apps");
   },
+  savePdf(payload) {
+    return ipcRenderer.invoke("signet:save-pdf", payload);
+  },
 });

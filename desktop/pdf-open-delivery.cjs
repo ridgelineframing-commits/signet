@@ -3,11 +3,12 @@ function normalizePdfPayload(payload) {
 
   const bytes = payload.bytes;
   if (bytes instanceof ArrayBuffer) {
-    return { name: payload.name, bytes: new Uint8Array(bytes) };
+    return { name: payload.name, path: typeof payload.path === "string" ? payload.path : null, bytes: new Uint8Array(bytes) };
   }
   if (ArrayBuffer.isView(bytes)) {
     return {
       name: payload.name,
+      path: typeof payload.path === "string" ? payload.path : null,
       bytes: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     };
   }

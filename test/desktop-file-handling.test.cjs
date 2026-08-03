@@ -4,7 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { extractPdfPaths } = require("../desktop/file-handling.cjs");
+const { canOverwritePdf, extractPdfPaths } = require("../desktop/file-handling.cjs");
 const { createPdfOpenDelivery, normalizePdfPayload } = require("../desktop/pdf-open-delivery.cjs");
 
 test("extractPdfPaths accepts existing PDFs and ignores other arguments", () => {
@@ -32,6 +32,13 @@ test("extractPdfPaths de-duplicates paths case-insensitively", () => {
   }
 });
 
+test("native Save only overwrites PDF paths previously opened by Signet", () => {
+  const allowed = new Set([path.resolve("C:\\Jobs\\estimate.pdf").toLowerCase()]);
+  assert.equal(canOverwritePdf("C:\\Jobs\\estimate.pdf", allowed), true);
+  assert.equal(canOverwritePdf("C:\\Jobs\\other.pdf", allowed), false);
+  assert.equal(canOverwritePdf("C:\\Jobs\\estimate.txt", allowed), false);
+});
+
 test("desktop PDF delivery buffers a cold-start file until the editor subscribes", () => {
   const delivery = createPdfOpenDelivery();
   const opened = [];
@@ -43,7 +50,16 @@ test("desktop PDF delivery buffers a cold-start file until the editor subscribes
   assert.equal(delivery.subscribe((payload) => opened.push(payload)), true);
   assert.equal(opened.length, 1);
   assert.equal(opened[0].name, "cold-start.pdf");
+  assert.equal(opened[0].path, null);
   assert.deepEqual([...opened[0].bytes], [...source]);
+});
+
+test("desktop PDF delivery preserves an original path for native Save", () => {
+  const delivery = createPdfOpenDelivery();
+  const opened = [];
+  delivery.subscribe((payload) => opened.push(payload));
+  delivery.receive({ name: "estimate.pdf", path: "C:\\Jobs\\estimate.pdf", bytes: new Uint8Array([1]) });
+  assert.equal(opened[0].path, "C:\\Jobs\\estimate.pdf");
 });
 
 test("desktop PDF delivery sends later files to an already-running editor", () => {
