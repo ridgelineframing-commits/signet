@@ -11,13 +11,13 @@ document.querySelectorAll(".pdflogo").forEach((oldLogo, i) => {
   const aria = label ? `role="img" aria-label="${escapeHtml(label)}"` : 'aria-hidden="true"';
   const mark = document.createElement("span");
   mark.innerHTML = `<svg class="pdflogo" viewBox="0 0 272 100" fill="none" xmlns="http://www.w3.org/2000/svg" ${aria}>
-    <defs><linearGradient id="logoGradient${i}" x1="117" y1="18" x2="176" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="#8A68FF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient></defs>
+    <defs><linearGradient id="logoGradient${i}" x1="108" y1="18" x2="172" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset=".55" stop-color="#2563EB"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs>
     <text x="2" y="75" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="74" letter-spacing="-4" fill="currentColor">PD</text>
-    <path d="M107 37h14M103 50h13M108 63h10" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".28"/>
-    <g transform="rotate(-6 145 52)"><text x="116" y="77" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="76" letter-spacing="-3" fill="url(#logoGradient${i})">F</text></g>
-    <g stroke="currentColor" stroke-width="4.3" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M172 57V38a5.2 5.2 0 0 1 10.4 0v11-17a5.2 5.2 0 0 1 10.4 0v17-13a5.2 5.2 0 0 1 10.4 0v14-8a5.2 5.2 0 0 1 10.4 0v20c0 16-10.5 26-27.2 26h-3.5c-13 0-21.2-5.5-27.2-16l-8-13.5a6.2 6.2 0 0 1 9.9-7.2l9.3 10.3c2 2.2 3.8 1.7 5.3-.4z"/>
-      <path d="M172 51c5.2 2.6 10.5 2.7 15.8.2" opacity=".45"/>
+    <path d="M104 43h12M101 55h11" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".3"/>
+    <g transform="rotate(-5 137 52)"><text x="108" y="77" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="76" letter-spacing="-3" fill="url(#logoGradient${i})">F</text></g>
+    <g stroke="currentColor" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M163 58V41a4.8 4.8 0 0 1 9.6 0v10-15a4.8 4.8 0 0 1 9.6 0v15-11a4.8 4.8 0 0 1 9.6 0v12-6a4.8 4.8 0 0 1 9.6 0v17c0 14-9.2 23-23.8 23h-3c-11.5 0-18.7-4.8-24-14l-7-11.8a5.6 5.6 0 0 1 8.9-6.5l8.2 9c1.7 2 3.3 1.5 4.3-.3z"/>
+      <path d="M163 53c4.6 2.3 9.3 2.4 13.9.2" opacity=".42"/>
     </g>
   </svg>`;
   oldLogo.replaceWith(mark.firstElementChild);
@@ -94,11 +94,11 @@ const tk = {
   activeText: null,
   pendingImage: null,
   ink: { color: "#dc2b3b", width: 3 },
-  shape: { type: "rect", color: "#6A4CF0", fill: false, width: 2 },
+  shape: { type: "rect", color: "#5B3FD6", fill: false, width: 2 },
   placeArmed: false,
   autoFit: true,
 };
-const RECIPIENT_COLORS = ["#6A4CF0", "#17936a", "#b5760b", "#dc2b3b", "#7a3fb5"];
+const RECIPIENT_COLORS = ["#5B3FD6", "#0F9F74", "#D97706", "#DC2B3B", "#2563EB"];
 const SVG_NS = "http://www.w3.org/2000/svg";
 // pdf.js render scale: canvas px = PDF points * RENDER_SCALE. Used to keep on-canvas text
 // sizing and vector stroke widths visually consistent with the exported PDF.
@@ -903,7 +903,7 @@ function drawEditTextMarker(box, a) {
   m.textContent = a.text;
   // Until a line is edited it shows the real page underneath (transparent text over a faint
   // tint); editing/focusing reveals the text on an opaque white patch (see .edittext:focus).
-  m.style.background = a.dirty ? "#fff" : (editable ? "rgba(106,76,240,.07)" : "transparent");
+  m.style.background = a.dirty ? "#fff" : (editable ? "rgba(91,63,214,.07)" : "transparent");
   m.style.color = a.dirty ? "#0d0d14" : "transparent";
   a._el = m;
   if (editable) {
@@ -1254,7 +1254,7 @@ function buildDrawPanel(body) {
     <div class="swrow">
       <button class="sw" data-c="#dc2b3b" style="background:#dc2b3b"></button>
       <button class="sw" data-c="#191b1f" style="background:#191b1f"></button>
-      <button class="sw" data-c="#6A4CF0" style="background:#6A4CF0"></button>
+      <button class="sw" data-c="#5B3FD6" style="background:#5B3FD6"></button>
       <button class="sw" data-c="#17936a" style="background:#17936a"></button>
       <input type="color" id="inkCustom" value="${tk.ink.color}" style="width:32px;height:32px;border:1px solid var(--line2);border-radius:7px;padding:2px" />
     </div>
@@ -1275,7 +1275,7 @@ function buildShapePanel(body) {
     </div>
     <div class="label">Color</div>
     <div class="swrow">
-      <button class="sw" data-c="#6A4CF0" style="background:#6A4CF0"></button>
+      <button class="sw" data-c="#5B3FD6" style="background:#5B3FD6"></button>
       <button class="sw" data-c="#dc2b3b" style="background:#dc2b3b"></button>
       <button class="sw" data-c="#191b1f" style="background:#191b1f"></button>
       <button class="sw" data-c="#17936a" style="background:#17936a"></button>
@@ -1783,8 +1783,8 @@ const STATUS_LABEL = {
   completed: "Completed", voided: "Voided", declined: "Declined",
 };
 const STATUS_COLOR = {
-  draft: ["#eef2f6", "#5b6068"], sent: ["#eef1ff", "#6A4CF0"], partially_signed: ["#fff3e0", "#b5760b"],
-  completing: ["#eef1ff", "#6A4CF0"], delivery_partial: ["#fff3e0", "#b5760b"], delivery_failed: ["#fbf5f5", "#dc2b3b"],
+  draft: ["#EEF2F7", "#566273"], sent: ["#EEF2FF", "#5B3FD6"], partially_signed: ["#FFF3E0", "#D97706"],
+  completing: ["#EEF2FF", "#5B3FD6"], delivery_partial: ["#FFF3E0", "#D97706"], delivery_failed: ["#FBF5F5", "#DC2B3B"],
   completed: ["#e4f6ea", "#17936a"], voided: ["#fbf5f5", "#dc2b3b"], declined: ["#fbf5f5", "#dc2b3b"],
 };
 const envelopesPanel = $("envelopesPanelBack");

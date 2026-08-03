@@ -9,6 +9,7 @@
   "description": "Browser-first PDF editor with optional self-hosted e-signature workflows on Cloudflare Workers, D1, R2, and Resend.",
   "scripts": {
     "test": "node --test",
+    "brand:icons": "node desktop/render-brand-assets.mjs",
     "desktop:start": "node desktop/build-icon.mjs && electron-forge start",
     "desktop:package": "node desktop/build-icon.mjs && electron-forge package --platform=win32 --arch=x64",
     "desktop:make": "node desktop/build-icon.mjs && electron-forge make --platform=win32 --arch=x64",
@@ -36,6 +37,7 @@
     "@tesseract.js-data/eng": "^1.0.0",
     "electron": "^43.2.0",
     "pdfjs-dist": "^6.1.200",
+    "sharp": "^0.34.5",
     "tesseract.js": "^5.1.1",
     "tesseract.js-core": "^5.1.1",
     "wrangler": "^4.111.0"

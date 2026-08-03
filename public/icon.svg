@@ -1,25 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Signet PDF editor">
   <defs>
-    <linearGradient id="bg" x1="56" y1="38" x2="456" y2="474" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7858F4"/>
-      <stop offset="1" stop-color="#4F86FF"/>
+    <linearGradient id="prism" x1="34" y1="28" x2="478" y2="486" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="0.55" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#06B6D4"/>
     </linearGradient>
-    <linearGradient id="f" x1="230" y1="230" x2="325" y2="362" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#8462F7"/>
-      <stop offset="1" stop-color="#4F86FF"/>
+    <linearGradient id="edit" x1="246" y1="220" x2="326" y2="358" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="0.55" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#06B6D4"/>
     </linearGradient>
+    <filter id="paperShadow" x="56" y="82" width="408" height="374" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#111827" flood-opacity="0.18"/>
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-  <path d="M94 128h234l68 68v184c0 23-19 42-42 42H94c-23 0-42-19-42-42V170c0-23 19-42 42-42Z" fill="#fff"/>
-  <path d="M328 128v68h68" fill="#E9E6FF"/>
-  <path d="M94 128h234l68 68v184c0 23-19 42-42 42H94c-23 0-42-19-42-42V170c0-23 19-42 42-42Z" fill="none" stroke="#352777" stroke-width="12" stroke-linejoin="round"/>
-  <text x="68" y="344" font-family="Arial,sans-serif" font-weight="900" font-size="126" letter-spacing="-10" fill="#292244">PD</text>
-  <path d="M218 245h24M210 272h23M218 299h17" stroke="#9A91C8" stroke-width="9" stroke-linecap="round"/>
-  <g transform="rotate(-7 283 298)">
-    <text x="231" y="359" font-family="Arial,sans-serif" font-weight="900" font-size="137" fill="url(#f)">F</text>
+
+  <rect width="512" height="512" rx="116" fill="url(#prism)"/>
+  <g filter="url(#paperShadow)">
+    <path d="M96 112h230l82 82v190c0 24-20 44-44 44H96c-24 0-44-20-44-44V156c0-24 20-44 44-44Z" fill="#F8FAFC"/>
+    <path d="M326 112v82h82" fill="#E7ECF5"/>
+    <path d="M96 112h230l82 82v190c0 24-20 44-44 44H96c-24 0-44-20-44-44V156c0-24 20-44 44-44Z" fill="none" stroke="#111827" stroke-width="10" stroke-linejoin="round"/>
   </g>
-  <g fill="#fff" stroke="#292244" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M317 323v-48a12 12 0 0 1 24 0v29-42a12 12 0 0 1 24 0v42-31a12 12 0 0 1 24 0v34-18a12 12 0 0 1 24 0v49c0 40-25 65-65 65h-8c-31 0-51-13-66-39l-19-32a14 14 0 0 1 22-16l22 24c5 6 11 4 18-3Z"/>
-    <path d="M317 307c13 7 27 7 40 1" fill="none" opacity=".45"/>
+
+  <text x="70" y="340" font-family="Arial,sans-serif" font-weight="900" font-size="124" letter-spacing="-11" fill="#111827">PD</text>
+  <path d="M220 254h22M214 279h21" stroke="#94A3B8" stroke-width="8" stroke-linecap="round"/>
+  <g transform="rotate(-5 279 294)">
+    <text x="238" y="350" font-family="Arial,sans-serif" font-weight="900" font-size="132" letter-spacing="-5" fill="url(#edit)">F</text>
+  </g>
+
+  <g transform="translate(62 69) scale(.82)" fill="#F8FAFC" stroke="#111827" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M329 334v-43a10 10 0 0 1 20 0v24-35a10 10 0 0 1 20 0v35-24a10 10 0 0 1 20 0v28-13a10 10 0 0 1 20 0v39c0 33-21 53-54 53h-7c-25 0-42-11-54-32l-15-25a11 11 0 0 1 17-13l18 20c5 6 10 4 15-2Z"/>
+    <path d="M329 319c11 6 23 6 34 1" fill="none" opacity="0.42"/>
   </g>
 </svg>

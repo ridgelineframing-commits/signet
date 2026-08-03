@@ -8,15 +8,15 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<meta name="theme-color" content="#6A4CF0" />
+<meta name="theme-color" content="#5B3FD6" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="Signet" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <link href="./vendor/fonts.css" rel="stylesheet">
 <style>
-:root{--accent:#6A4CF0;--grad:linear-gradient(135deg,#6A4CF0,#4F86FF);--ink:#191b1f;--ink2:#24262c;--sub:#5b6068;--sub2:#7c8089;--sub3:#9aa0a8;
---line:#e7e8ec;--line2:#e2e3e8;--bg:#ecebef;--panel:#f7f7f9;--chip:#f2f2f5;
+:root{--accent:#5B3FD6;--grad:linear-gradient(135deg,#6D28D9 0%,#2563EB 58%,#0891B2 100%);--ink:#111827;--ink2:#1F2937;--sub:#566273;--sub2:#718096;--sub3:#94A3B8;
+--line:#DDE2EC;--line2:#D5DCE8;--bg:#E9EEF6;--panel:#F5F7FB;--chip:#EEF2F7;
 --good:#17936a;--warn:#b5760b;--bad:#dc2b3b;--badbg:#fbf5f5;--badline:#f0d9d9;}
 *{box-sizing:border-box;}
 [hidden]{display:none !important;}
@@ -26,7 +26,7 @@ button{font:inherit;cursor:pointer;}
 input,select,textarea{font:inherit;}
 .btn{height:36px;padding:0 14px;border:1px solid var(--line2);border-radius:8px;background:#fff;color:var(--ink2);font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;}
 .btn:hover{background:#f7f7f9;}
-.btn.primary{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 1px 2px rgba(106,76,240,.35);}
+.btn.primary{background:var(--grad);border-color:transparent;color:#fff;box-shadow:0 1px 2px rgba(37,99,235,.32);}
 .btn.primary:hover{filter:brightness(1.06);}
 .btn.danger{background:var(--bad);border-color:var(--bad);color:#fff;}
 .btn.danger:hover{filter:brightness(1.06);}
@@ -39,7 +39,7 @@ input[type=text],input[type=email],input[type=number],input[type=password],selec
 .hint{font-size:12px;color:var(--sub2);line-height:1.5;}
 
 #loginScreen{position:fixed;inset:0;z-index:70;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
-  background:radial-gradient(120% 120% at 15% 0%,#3a2a72 0%,#201a3a 45%,#14111f 100%);}
+  background:radial-gradient(120% 120% at 15% 0%,#4C1D95 0%,#172554 48%,#0F172A 100%);}
 #loginScreen[hidden]{display:none;}
 #loginScreen .logomark.big{margin-bottom:0;}
 #loginScreen .box{position:relative;background:#fff;padding:32px;border-radius:16px;width:320px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.4);}
@@ -57,7 +57,7 @@ header.topbar{height:56px;flex:0 0 56px;display:flex;align-items:center;gap:14px
 .logomark{background:var(--grad);display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border-radius:7px;}
 .logomark svg{width:66%;height:66%;display:block;}
 .logomark.hdr{width:26px;height:26px;}
-.logomark.big{width:64px;height:64px;border-radius:16px;box-shadow:0 10px 26px rgba(106,76,240,.4);}
+.logomark.big{width:64px;height:64px;border-radius:16px;box-shadow:0 10px 26px rgba(37,99,235,.36);}
 .vdiv{width:1px;height:24px;background:var(--line);}
 .doctitle{font-size:13.5px;font-weight:600;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;}
 .chip{font-size:11px;color:var(--sub3);background:var(--chip);padding:2px 8px;border-radius:5px;font-weight:600;}
@@ -67,7 +67,7 @@ header.topbar{height:56px;flex:0 0 56px;display:flex;align-items:center;gap:14px
 nav.rail{flex:0 0 60px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;overflow-y:auto;}
 nav.rail .railbtn{width:44px;height:44px;border:none;border-radius:9px;color:var(--sub);background:transparent;display:flex;align-items:center;justify-content:center;}
 nav.rail .railbtn:hover{background:var(--chip);}
-nav.rail .railbtn.active{background:var(--grad);color:#fff;box-shadow:0 2px 9px rgba(106,76,240,.34);}
+nav.rail .railbtn.active{background:var(--grad);color:#fff;box-shadow:0 2px 9px rgba(37,99,235,.30);}
 nav.rail .railbtn svg{width:22px;height:22px;display:block;}
 nav.rail .raildiv{width:28px;height:1px;background:#eeeef1;margin:5px 0;}
 nav.rail .railbtn{position:relative;}
@@ -82,7 +82,7 @@ aside.thumbs .thead{font-size:11px;font-weight:700;letter-spacing:.06em;text-tra
 .thumb{width:118px;border:none;background:transparent;padding:0;display:flex;flex-direction:column;align-items:center;gap:5px;}
 .thumb .card{width:118px;border:1px solid #dfe0e6;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;background:#fff;cursor:grab;}
 .thumb .card canvas{width:100%;display:block;}
-.thumb.current .card{box-shadow:0 0 0 2px var(--accent),0 2px 8px rgba(106,76,240,.2);}
+.thumb.current .card{box-shadow:0 0 0 2px var(--accent),0 2px 8px rgba(37,99,235,.18);}
 .thumb .lbl{font-size:11px;color:var(--sub3);font-weight:500;}
 .thumb.current .lbl{color:var(--accent);font-weight:700;}
 .addpages{width:118px;height:40px;margin:6px auto 0;border:1px dashed #d3d4db;border-radius:8px;background:#fbfbfc;font-size:11.5px;color:var(--sub);}
@@ -126,14 +126,14 @@ aside.props{flex:0 0 300px;background:#fff;border-left:1px solid var(--line);ove
 .tabbtns{display:flex;gap:6px;margin-bottom:14px;}
 .tabbtns button{flex:1;background:var(--chip);border:none;padding:8px 0;border-radius:7px;font-size:12.5px;}
 .tabbtns button.active{background:var(--ink);color:#fff;}
-.marker{position:absolute;border:1.5px dashed var(--accent);background:rgba(106,76,240,.1);font-size:9px;color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.marker{position:absolute;border:1.5px dashed var(--accent);background:rgba(91,63,214,.1);font-size:9px;color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .textmarker{font-family:Helvetica,Arial,sans-serif;cursor:text;min-width:6px;z-index:3;}
 .edittext{position:absolute;white-space:pre-wrap;overflow:hidden;outline:none;line-height:1.05;font-family:Helvetica,Arial,sans-serif;color:#0d0d14;cursor:text;box-sizing:border-box;padding:0 1px;z-index:3;}
 .edittext:focus{box-shadow:0 0 0 1.5px var(--accent);background:#fff !important;color:#0d0d14 !important;}
 .x{position:absolute;width:16px;height:16px;border-radius:50%;border:none;background:var(--bad);color:#fff;font-size:10px;line-height:1;z-index:6;padding:0;}
 .marker .x{top:-8px;right:-8px;}
-.selframe{position:absolute;border:1px dashed var(--accent);background:rgba(106,76,240,.05);cursor:move;z-index:4;}
-.selframe.sel{border:2px solid var(--accent);background:rgba(106,76,240,.1);}
+.selframe{position:absolute;border:1px dashed var(--accent);background:rgba(91,63,214,.05);cursor:move;z-index:4;}
+.selframe.sel{border:2px solid var(--accent);background:rgba(91,63,214,.1);}
 .selframe .rz{position:absolute;right:-6px;bottom:-6px;width:12px;height:12px;border-radius:50%;background:#fff;border:1.5px solid var(--accent);cursor:nwse-resize;z-index:7;}
 canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;touch-action:none;background:#fbfbfc;width:100%;}
 
@@ -335,7 +335,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 <body>
 
 <div id="loginScreen" hidden>
-  <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="plg2" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#8A68FF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg2)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg>
+  <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="plg2" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg2)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg>
   <div class="box">
     <button id="loginCancel" title="Close" aria-label="Close">&times;</button>
     <h1>Signet<span style="color:var(--accent)">.</span></h1>
@@ -350,7 +350,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   <header class="topbar">
     <button class="icon-btn mobile-only" id="pagesToggle" title="Pages" hidden>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg></button>
-    <div class="brand"><svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="PDF editor"><defs><linearGradient id="plg" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#8A68FF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg><span class="desktop-only" style="font-size:19px;font-weight:700;letter-spacing:-.01em">Signet<span style="color:var(--accent)">.</span></span></div>
+    <div class="brand"><svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="PDF editor"><defs><linearGradient id="plg" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg><span class="desktop-only" style="font-size:19px;font-weight:700;letter-spacing:-.01em">Signet<span style="color:var(--accent)">.</span></span></div>
     <div class="vdiv desktop-only"></div>
     <div class="row desktop-only" style="min-width:0">
       <span class="doctitle" id="docTitleLbl">No document loaded</span>
@@ -586,7 +586,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <div class="canvaswrap">
       <div class="canvasscroll" id="canvasScroll">
         <div class="empty-state" id="emptyState">
-          <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="plg3" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#8A68FF"/><stop offset="1" stop-color="#4F86FF"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg3)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg>
+          <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="plg3" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg3)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg>
           <h2>Open a document and start editing</h2>
           <p>Drop files here, or choose them below. Select several files to combine them in order.</p>
           <label class="btn primary open-file" for="fileInput">Choose files</label>
