@@ -564,6 +564,16 @@ document.querySelectorAll("#toolRail [data-tool]").forEach((b) => {
 });
 $("ribbonScrim").onclick = () => selectTool("select");
 
+// Once a signature/initials is armed for placement, get the tool UI out of the way so the
+// next click lands on the page. On desktop the signature popup's scrim covers the canvas and
+// would swallow the click (cancelling back to Select); on mobile the properties bottom-sheet
+// covers most of the page. Both must be dismissed, or nothing places.
+function dismissSigPopup() {
+  document.body.classList.remove("ribbon-popup");
+  $("ribbonScrim").hidden = true;
+  closePropsSheet();
+}
+
 // ---- Word-style header: first-level tabs switch the second-level command ribbon. ----
 function setRibbonTab(name) {
   document.querySelectorAll("#menuBar .ribbontab").forEach((tab) => {
@@ -1402,7 +1412,8 @@ function buildSigPanel(body) {
       const s = loadSavedSigs().find((x) => x.id === el.dataset.id);
       if (!s) return;
       tk.pendingSig = { dataUrl: s.dataUrl, kind: "signature" }; tk.placeArmed = true;
-      if (isMobile()) toast("Now tap the page to drop your signature.");
+      dismissSigPopup();
+      toast(isMobile() ? "Now tap the page to drop your signature." : "Click the page to drop your signature.");
       renderPropsPanel();
     };
   });
@@ -1441,11 +1452,15 @@ function buildSigPanel(body) {
   };
   $("placeSigBtn").onclick = async () => {
     const dataUrl = await buildDataUrl(); if (!dataUrl) return toast("Draw, type, or upload a signature first.", "error");
-    tk.pendingSig = { dataUrl, kind: "signature" }; tk.placeArmed = true; renderPropsPanel();
+    tk.pendingSig = { dataUrl, kind: "signature" }; tk.placeArmed = true;
+    dismissSigPopup(); toast(isMobile() ? "Now tap the page to drop your signature." : "Click the page to drop your signature.");
+    renderPropsPanel();
   };
   $("placeInitBtn").onclick = async () => {
     const dataUrl = await buildDataUrl(); if (!dataUrl) return toast("Draw, type, or upload a signature first.", "error");
-    tk.pendingSig = { dataUrl, kind: "initials" }; tk.placeArmed = true; renderPropsPanel();
+    tk.pendingSig = { dataUrl, kind: "initials" }; tk.placeArmed = true;
+    dismissSigPopup(); toast(isMobile() ? "Now tap the page to drop your initials." : "Click the page to drop your initials.");
+    renderPropsPanel();
   };
 }
 
