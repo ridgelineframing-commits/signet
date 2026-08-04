@@ -183,9 +183,13 @@ The installer is unsigned unless a Windows code-signing certificate is added to 
 maker configuration. An unsigned build still installs, but Windows SmartScreen may identify it
 as coming from an unknown publisher.
 
-- **Desktop (Chrome/Edge) & ChromeOS:** visit the site, install it (the install icon in the
-  address bar, or ⋮ → *Install Signet*). Once installed it registers as a `.pdf` handler and
-  appears in the OS "Open with" list. You can also *share* a PDF to it.
+- **Windows desktop app:** launch the packaged app once to register Signet in the Windows
+  "Open with" and Default apps lists. In Signet, use *Help → Default PDF app → Open settings*,
+  search for `.pdf`, and choose **Signet PDF Editor**. Double-clicked PDFs are passed securely
+  into the existing Signet window.
+- **Desktop Chrome/Edge & ChromeOS:** visit the site, install it (the install icon in the
+  address bar, or browser menu → *Install Signet*). Once installed it registers as a `.pdf`
+  handler where the browser and OS support the File Handling API.
 - **iPad/iPhone (Safari):** *Share → Add to Home Screen*. iOS doesn't expose a system-wide
   default-PDF-app hook to web apps, but the installed icon opens the full editor and you can
   *Share → Signet* a PDF into it.

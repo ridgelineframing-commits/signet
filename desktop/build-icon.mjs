@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
+await import("./render-brand-assets.mjs");
 const png = await readFile(path.join(directory, "..", "public", "icon-doc-256.png"));
 
 // Windows Vista and newer accept a PNG-compressed 256px image inside an ICO.
