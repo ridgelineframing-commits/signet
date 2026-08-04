@@ -70,6 +70,13 @@ test("sandboxed preload exposes the desktop API without requiring a local module
   assert.equal(sent[0].channel, "signet:editor-ready");
 });
 
+test("editor-ready delivery is not blocked while the page is still loading", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../desktop/main.cjs"), "utf8");
+  const deliveryFunction = source.match(/async function sendPendingPdfs\(\) \{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.ok(deliveryFunction.includes("!editorReady"), "delivery must still wait for the editor-ready handshake");
+  assert.doesNotMatch(deliveryFunction, /\.isLoading\(\)/, "the ready handshake is sufficient even during document load");
+});
+
 test("sandboxed preload reports successful PDF delivery to the native queue", async () => {
   const { desktopApi, listeners, sent } = executeSandboxedPreload();
   const opened = [];
