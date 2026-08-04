@@ -34,7 +34,7 @@ const hasAllowedOrigin = (candidate) => {
 };
 
 async function sendPendingPdfs() {
-  if (!editorReady || inFlightPdf || !pendingPdfPaths.length || !mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isLoading()) return;
+  if (!editorReady || inFlightPdf || !pendingPdfPaths.length || !mainWindow || mainWindow.isDestroyed()) return;
   const resolvedPath = path.resolve(pendingPdfPaths[0]);
   try {
     const stat = await fs.promises.stat(resolvedPath);
