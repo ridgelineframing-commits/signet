@@ -4,18 +4,7 @@ const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require("e
 const {
   canOverwritePdf,
   extractPdfPaths,
-  registerWindowsPdfHandler,
-  unregisterWindowsPdfHandler,
 } = require("./file-handling.cjs");
-
-const squirrelCommand = process.platform === "win32" ? process.argv[1] : "";
-if (squirrelCommand === "--squirrel-install" || squirrelCommand === "--squirrel-updated") {
-  registerWindowsPdfHandler();
-} else if (squirrelCommand === "--squirrel-uninstall") {
-  unregisterWindowsPdfHandler();
-}
-
-if (require("electron-squirrel-startup")) app.quit();
 
 const SMOKE_TEST = process.argv.includes("--smoke-test") || process.env.SIGNET_SMOKE_TEST === "1";
 const APP_URL = "https://signet.ridgeline.workers.dev/";
@@ -24,8 +13,12 @@ const MAX_OPEN_FILE_BYTES = 200 * 1024 * 1024;
 let mainWindow = null;
 let pendingPdfPaths = extractPdfPaths(process.argv.slice(1));
 const writablePdfPaths = new Set();
+let editorReady = false;
+let inFlightPdf = null;
+let deliverySequence = 0;
+let deliveryTimer = null;
 
-app.setAppUserModelId("com.squirrel.SignetPDFEditor.SignetPDFEditor");
+app.setAppUserModelId("com.ridgelineframing.signet");
 app.enableSandbox();
 if (SMOKE_TEST) {
   app.disableHardwareAcceleration();
@@ -41,23 +34,57 @@ const hasAllowedOrigin = (candidate) => {
 };
 
 async function sendPendingPdfs() {
-  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isLoading()) return;
-  const paths = pendingPdfPaths;
-  pendingPdfPaths = [];
-  for (const pdfPath of paths) {
-    try {
-      const stat = await fs.promises.stat(pdfPath);
-      if (!stat.isFile() || stat.size > MAX_OPEN_FILE_BYTES) continue;
-      const bytes = await fs.promises.readFile(pdfPath);
-      const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-      const resolvedPath = path.resolve(pdfPath);
-      writablePdfPaths.add(resolvedPath.toLowerCase());
-      mainWindow.webContents.send("signet:open-pdf", { name: path.basename(resolvedPath), path: resolvedPath, bytes: arrayBuffer });
-      app.addRecentDocument(pdfPath);
-    } catch {
-      // The file may have moved or become unreadable after the OS launched Signet.
-    }
+  if (!editorReady || inFlightPdf || !pendingPdfPaths.length || !mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isLoading()) return;
+  const resolvedPath = path.resolve(pendingPdfPaths[0]);
+  try {
+    const stat = await fs.promises.stat(resolvedPath);
+    if (!stat.isFile()) throw new Error("The selected path is not a file.");
+    if (stat.size > MAX_OPEN_FILE_BYTES) throw new Error("This PDF is larger than Signet's 200 MB desktop limit.");
+    const bytes = await fs.promises.readFile(resolvedPath);
+    const id = `${Date.now()}-${++deliverySequence}`;
+    const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    inFlightPdf = { id, path: resolvedPath };
+    writablePdfPaths.add(resolvedPath.toLowerCase());
+    mainWindow.webContents.send("signet:open-pdf", { id, name: path.basename(resolvedPath), path: resolvedPath, bytes: arrayBuffer });
+    deliveryTimer = setTimeout(() => {
+      finishPdfDelivery({ id, ok: false, error: "The editor did not respond within 30 seconds." });
+    }, 30_000);
+  } catch (error) {
+    pendingPdfPaths.shift();
+    await dialog.showMessageBox(mainWindow, {
+      type: "error",
+      title: "Signet couldn't open this PDF",
+      message: `Signet couldn't read ${path.basename(resolvedPath)}.`,
+      detail: String(error?.message || "The file may have moved or become unreadable."),
+      buttons: ["OK"],
+    });
+    sendPendingPdfs();
   }
+}
+
+async function finishPdfDelivery(payload) {
+  if (!inFlightPdf || payload?.id !== inFlightPdf.id) return;
+  if (deliveryTimer) clearTimeout(deliveryTimer);
+  deliveryTimer = null;
+  const completed = inFlightPdf;
+  inFlightPdf = null;
+  if (payload?.ok === true) {
+    if (pendingPdfPaths[0]?.toLowerCase() === completed.path.toLowerCase()) pendingPdfPaths.shift();
+    app.addRecentDocument(completed.path);
+    sendPendingPdfs();
+    return;
+  }
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "error",
+    title: "Signet couldn't open this PDF",
+    message: `Signet couldn't open ${path.basename(completed.path)}.`,
+    detail: String(payload?.error || "The editor did not accept the file."),
+    buttons: ["Retry", "Cancel"],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (result.response === 1 && pendingPdfPaths[0]?.toLowerCase() === completed.path.toLowerCase()) pendingPdfPaths.shift();
+  sendPendingPdfs();
 }
 
 function queuePdfPaths(argv, workingDirectory) {
@@ -103,7 +130,13 @@ function createWindow() {
     if (SMOKE_TEST) return app.exit(2);
     mainWindow.loadFile(path.join(__dirname, "offline.html"));
   });
-  mainWindow.webContents.on("did-finish-load", sendPendingPdfs);
+  mainWindow.webContents.on("did-start-navigation", (_event, _url, _isInPlace, isMainFrame) => {
+    if (!isMainFrame) return;
+    editorReady = false;
+    inFlightPdf = null;
+    if (deliveryTimer) clearTimeout(deliveryTimer);
+    deliveryTimer = null;
+  });
 
   mainWindow.loadURL(APP_URL);
 }
@@ -123,11 +156,19 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     if (SMOKE_TEST) return app.exit(0);
-    if (!process.defaultApp && !SMOKE_TEST) registerWindowsPdfHandler();
     Menu.setApplicationMenu(null);
     session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
     session.defaultSession.setPermissionCheckHandler(() => false);
     ipcMain.handle("signet:open-default-apps", () => shell.openExternal("ms-settings:defaultapps"));
+    ipcMain.on("signet:editor-ready", (event) => {
+      if (!hasAllowedOrigin(event.senderFrame?.url || "")) return;
+      editorReady = true;
+      sendPendingPdfs();
+    });
+    ipcMain.on("signet:pdf-open-result", async (event, payload) => {
+      if (!hasAllowedOrigin(event.senderFrame?.url || "") || !inFlightPdf || payload?.id !== inFlightPdf.id) return;
+      await finishPdfDelivery(payload);
+    });
     ipcMain.handle("signet:save-pdf", async (event, payload) => {
       if (!hasAllowedOrigin(event.senderFrame?.url || "")) throw new Error("Untrusted save request");
       const rawBytes = payload?.bytes;

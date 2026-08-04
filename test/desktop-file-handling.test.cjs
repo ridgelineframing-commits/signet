@@ -3,9 +3,33 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
+const vm = require("node:vm");
 
 const { canOverwritePdf, extractPdfPaths } = require("../desktop/file-handling.cjs");
-const { createPdfOpenDelivery, normalizePdfPayload } = require("../desktop/pdf-open-delivery.cjs");
+
+function executeSandboxedPreload() {
+  const listeners = new Map();
+  const sent = [];
+  let desktopApi = null;
+  const electron = {
+    contextBridge: { exposeInMainWorld: (_name, api) => { desktopApi = api; } },
+    ipcRenderer: {
+      invoke: async () => null,
+      on: (channel, callback) => listeners.set(channel, callback),
+      send: (channel, payload) => sent.push({ channel, payload }),
+    },
+  };
+  const source = fs.readFileSync(path.join(__dirname, "../desktop/preload.cjs"), "utf8");
+  vm.runInNewContext(source, {
+    ArrayBuffer,
+    Uint8Array,
+    require(moduleName) {
+      assert.equal(moduleName, "electron", "sandboxed preload must not require local modules");
+      return electron;
+    },
+  });
+  return { desktopApi, listeners, sent };
+}
 
 test("extractPdfPaths accepts existing PDFs and ignores other arguments", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "signet-file-handler-"));
@@ -39,40 +63,27 @@ test("native Save only overwrites PDF paths previously opened by Signet", () => 
   assert.equal(canOverwritePdf("C:\\Jobs\\estimate.txt", allowed), false);
 });
 
-test("desktop PDF delivery buffers a cold-start file until the editor subscribes", () => {
-  const delivery = createPdfOpenDelivery();
-  const opened = [];
-  const source = Uint8Array.from([37, 80, 68, 70]);
-
-  assert.equal(delivery.receive({ name: "cold-start.pdf", bytes: source.buffer }), true);
-  assert.deepEqual(opened, []);
-
-  assert.equal(delivery.subscribe((payload) => opened.push(payload)), true);
-  assert.equal(opened.length, 1);
-  assert.equal(opened[0].name, "cold-start.pdf");
-  assert.equal(opened[0].path, null);
-  assert.deepEqual([...opened[0].bytes], [...source]);
+test("sandboxed preload exposes the desktop API without requiring a local module", () => {
+  const { desktopApi, sent } = executeSandboxedPreload();
+  assert.ok(desktopApi);
+  assert.equal(desktopApi.onOpenPdf(() => true), true);
+  assert.equal(sent[0].channel, "signet:editor-ready");
 });
 
-test("desktop PDF delivery preserves an original path for native Save", () => {
-  const delivery = createPdfOpenDelivery();
+test("sandboxed preload reports successful PDF delivery to the native queue", async () => {
+  const { desktopApi, listeners, sent } = executeSandboxedPreload();
   const opened = [];
-  delivery.subscribe((payload) => opened.push(payload));
-  delivery.receive({ name: "estimate.pdf", path: "C:\\Jobs\\estimate.pdf", bytes: new Uint8Array([1]) });
+  desktopApi.onOpenPdf(async (payload) => { opened.push(payload); return true; });
+  listeners.get("signet:open-pdf")(null, {
+    id: "delivery-1",
+    name: "estimate.pdf",
+    path: "C:\\Jobs\\estimate.pdf",
+    bytes: Uint8Array.from([37, 80, 68, 70]),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(opened[0].path, "C:\\Jobs\\estimate.pdf");
-});
-
-test("desktop PDF delivery sends later files to an already-running editor", () => {
-  const delivery = createPdfOpenDelivery();
-  const opened = [];
-  delivery.subscribe((payload) => opened.push(payload.name));
-
-  assert.equal(delivery.receive({ name: "first.pdf", bytes: new Uint8Array([1, 2]) }), true);
-  assert.equal(delivery.receive({ name: "second.pdf", bytes: new Uint8Array([3, 4]) }), true);
-  assert.deepEqual(opened, ["first.pdf", "second.pdf"]);
-});
-
-test("desktop PDF delivery rejects malformed messages", () => {
-  assert.equal(normalizePdfPayload(null), null);
-  assert.equal(normalizePdfPayload({ name: "not-a-pdf.pdf", bytes: "bad" }), null);
+  assert.deepEqual([...opened[0].bytes], [37, 80, 68, 70]);
+  assert.equal(sent.at(-1).channel, "signet:pdf-open-result");
+  assert.equal(sent.at(-1).payload.id, "delivery-1");
+  assert.equal(sent.at(-1).payload.ok, true);
 });

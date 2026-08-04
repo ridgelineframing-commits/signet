@@ -1,6 +1,6 @@
 {
   "name": "signet",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "main": "desktop/main.cjs",
@@ -14,6 +14,7 @@
     "desktop:package": "node desktop/build-icon.mjs && electron-forge package --platform=win32 --arch=x64",
     "desktop:make": "node desktop/build-icon.mjs && electron-forge make --platform=win32 --arch=x64",
     "desktop:zip": "node desktop/build-icon.mjs && electron-forge make --platform=win32 --arch=x64 --targets @electron-forge/maker-zip",
+    "desktop:installer": "node desktop/build-icon.mjs && electron-builder --win nsis --x64",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:migrate": "wrangler d1 execute signet-db --file=./schema.sql --remote",
@@ -24,18 +25,57 @@
   "config": {
     "forge": "./forge.config.cjs"
   },
+  "build": {
+    "appId": "com.ridgelineframing.signet",
+    "productName": "Signet PDF Editor",
+    "asar": true,
+    "directories": {
+      "output": "out-installer"
+    },
+    "files": [
+      "desktop/**/*",
+      "package.json",
+      "!desktop/build-icon.mjs",
+      "!desktop/render-brand-assets.mjs"
+    ],
+    "win": {
+      "icon": "desktop/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "fileAssociations": [
+      {
+        "ext": "pdf",
+        "name": "PDF document",
+        "description": "Open and edit PDF documents with Signet",
+        "icon": "desktop/icon.ico"
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": false,
+      "artifactName": "Signet-PDF-Editor-Setup-${version}.${ext}"
+    }
+  },
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.1",
-    "hono": "^4.6.0",
+    "hono": "^4.13.0",
     "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
-    "@electron-forge/maker-squirrel": "^7.11.2",
     "@electron-forge/maker-zip": "^7.11.2",
     "@fontsource/hanken-grotesk": "^5.2.8",
     "@tesseract.js-data/eng": "^1.0.0",
     "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "pdfjs-dist": "^6.1.200",
     "sharp": "^0.34.5",
     "tesseract.js": "^5.1.1",

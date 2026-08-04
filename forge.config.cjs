@@ -29,16 +29,5 @@ module.exports = {
       name: "@electron-forge/maker-zip",
       platforms: ["win32"],
     },
-    {
-      name: "@electron-forge/maker-squirrel",
-      config: {
-        name: "SignetPDFEditor",
-        authors: "Ridgeline Framing",
-        description: "Browser-first PDF editor with optional signature requests.",
-        setupExe: "Signet-PDF-Editor-Setup.exe",
-        setupIcon: path.join(__dirname, "desktop", "icon.ico"),
-        noMsi: true,
-      },
-    },
   ],
 };
