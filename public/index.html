@@ -180,12 +180,11 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 .toast.success{background:#17936a;}
 .toast.error{background:var(--bad);}
 
-/* new logo mark — PDF with a hand dragging the F; PD + hand use currentColor so it
-   adapts to light (header/empty-state) and dark (login) backgrounds; F stays gradient */
-.pdflogo{display:block;height:auto;}
-.brand .pdflogo{height:26px;color:var(--ink);}
-#loginScreen .pdflogo{height:64px;color:#fff;}
-.empty-state .pdflogo{height:72px;color:var(--ink);margin:0 auto 8px;}
+/* One rendered brand asset across the web editor, desktop shell, and install surfaces. */
+.brand-icon{display:block;object-fit:contain;}
+.brand-icon.header{width:30px;height:30px;border-radius:8px;}
+.brand-icon.login{width:76px;height:76px;margin-bottom:2px;filter:drop-shadow(0 10px 22px rgba(16,24,40,.24));}
+.brand-icon.empty{width:92px;height:92px;margin:0 auto 10px;}
 
 /* responsive helpers */
 .mobile-only{display:none !important;}
@@ -357,7 +356,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
 <body>
 
 <div id="loginScreen" hidden>
-  <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="plg2" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg2)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg>
+  <img class="brand-icon login" src="/icon.svg" alt="Signet PDF Editor" />
   <div class="box">
     <button id="loginCancel" title="Close" aria-label="Close">&times;</button>
     <h1>Signet<span style="color:var(--accent)">.</span></h1>
@@ -372,7 +371,7 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
   <header class="topbar">
     <button class="icon-btn mobile-only" id="pagesToggle" title="Pages" hidden>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg></button>
-    <div class="brand"><svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="PDF editor"><defs><linearGradient id="plg" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg><span class="desktop-only" style="font-size:19px;font-weight:700;letter-spacing:-.01em">Signet<span style="color:var(--accent)">.</span></span></div>
+    <div class="brand"><img class="brand-icon header" src="/icon.svg" alt="" /><span class="desktop-only" style="font-size:19px;font-weight:700;letter-spacing:-.01em">Signet<span style="color:var(--accent)">.</span></span></div>
     <div class="vdiv desktop-only"></div>
     <div class="row desktop-only" style="min-width:0">
       <span class="doctitle" id="docTitleLbl">No document loaded</span>
@@ -610,13 +609,13 @@ canvas#sigPad{border:1px solid var(--line2);border-radius:8px;cursor:crosshair;t
     <div class="canvaswrap">
       <div class="canvasscroll" id="canvasScroll">
         <div class="empty-state" id="emptyState">
-          <svg class="pdflogo" viewBox="0 0 340 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="plg3" x1="185" y1="22" x2="275" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs><text x="5" y="88" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="88" letter-spacing="-4" fill="currentColor">PD</text><path d="M174 43h21M168 59h19M176 75h14" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".32"/><g transform="rotate(-7 229 61)"><text x="190" y="91" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="91" letter-spacing="-4" fill="url(#plg3)">F</text></g><g stroke="currentColor" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"><path d="M257 69V45a7 7 0 0 1 14 0v15-22a7 7 0 0 1 14 0v22-16a7 7 0 0 1 14 0v21-11a7 7 0 0 1 14 0v27c0 21-13 32-32 32h-5c-16 0-26-7-34-20l-11-18a8 8 0 0 1 13-9z"/><path d="M255 62c8 4 17 4 25 0" opacity=".55"/></g></svg>
+          <img class="brand-icon empty" src="/icon.svg" alt="" />
           <h2>Open a document and start editing</h2>
           <p>Drop files here, or choose them below. Select several files to combine them in order.</p>
           <label class="btn primary open-file" for="fileInput">Choose files</label>
           <input type="file" id="fileInput" accept=".pdf,application/pdf,image/*,.txt,.md,.csv,text/plain,.docx" multiple hidden />
           <div class="format-pills" aria-label="Supported formats"><span>PDF</span><span>JPG / PNG</span><span>DOCX</span><span>TXT / MD / CSV</span></div>
-          <small class="privacy-note">Editing happens in your browser until you choose to send or download.</small>
+          <small class="privacy-note" id="emptyPrivacyText">Editing stays on this device until you choose Send for signature.</small>
         </div>
         <div class="pageshell" id="pageShell" hidden></div>
       </div>

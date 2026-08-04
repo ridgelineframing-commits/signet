@@ -4,24 +4,11 @@ const { PDFDocument, degrees, rgb, StandardFonts } = window.PDFLib;
 const $ = (id) => document.getElementById(id);
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
-// Compact PD-F mark: the F has just started moving and a clean, open hand is
-// gripping its right edge. IDs are unique because the mark appears three times.
-document.querySelectorAll(".pdflogo").forEach((oldLogo, i) => {
-  const label = oldLogo.getAttribute("aria-label");
-  const aria = label ? `role="img" aria-label="${escapeHtml(label)}"` : 'aria-hidden="true"';
-  const mark = document.createElement("span");
-  mark.innerHTML = `<svg class="pdflogo" viewBox="0 0 272 100" fill="none" xmlns="http://www.w3.org/2000/svg" ${aria}>
-    <defs><linearGradient id="logoGradient${i}" x1="108" y1="18" x2="172" y2="82" gradientUnits="userSpaceOnUse"><stop stop-color="#7C3AED"/><stop offset=".55" stop-color="#2563EB"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs>
-    <text x="2" y="75" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="74" letter-spacing="-4" fill="currentColor">PD</text>
-    <path d="M104 43h12M101 55h11" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" opacity=".3"/>
-    <g transform="rotate(-5 137 52)"><text x="108" y="77" font-family="'Hanken Grotesk',Arial,sans-serif" font-weight="800" font-size="76" letter-spacing="-3" fill="url(#logoGradient${i})">F</text></g>
-    <g stroke="currentColor" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M163 58V41a4.8 4.8 0 0 1 9.6 0v10-15a4.8 4.8 0 0 1 9.6 0v15-11a4.8 4.8 0 0 1 9.6 0v12-6a4.8 4.8 0 0 1 9.6 0v17c0 14-9.2 23-23.8 23h-3c-11.5 0-18.7-4.8-24-14l-7-11.8a5.6 5.6 0 0 1 8.9-6.5l8.2 9c1.7 2 3.3 1.5 4.3-.3z"/>
-      <path d="M163 53c4.6 2.3 9.3 2.4 13.9.2" opacity=".42"/>
-    </g>
-  </svg>`;
-  oldLogo.replaceWith(mark.firstElementChild);
-});
+if (window.signetDesktop) {
+  document.title = "Signet PDF Editor";
+  const privacy = $("emptyPrivacyText");
+  if (privacy) privacy.textContent = "Files stay on this PC unless you choose Send for signature.";
+}
 
 // Non-blocking toast notifications (replaces toast()). type: "info" | "success" | "error".
 function toast(msg, type = "info") {
